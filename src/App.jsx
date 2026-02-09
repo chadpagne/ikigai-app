@@ -1,4 +1,20 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo,
+
+  useEffect(() => {
+    // Auto-snapshot once per month (idempotent): updates the current month point as you edit.
+    const d = new Date();
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    setNetWorthHistory((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [];
+      const idx = next.findIndex((p) => p.t === key);
+      const point = { t: key, value: netWorth };
+      if (idx >= 0) next[idx] = point;
+      else next.push(point);
+      // keep last 24 points
+      return next.slice(-24);
+    });
+  }, [netWorth]);
+ useState } from "react";
 import {
   Plus,
   Trash2,
@@ -65,13 +81,41 @@ function monthsBetween(from, toISO) {
   return Math.max(0, b - a);
 }
 
+
 function Tip({ text }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    function onDoc(e) {
+      // close on outside click/tap
+      if (!open) return;
+      const t = e.target;
+      if (t && t.closest && t.closest(".tooltip-wrap")) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
+  }, [open]);
+
   return (
-    <span className="chip" title={text} aria-label="Info">
-      <Info size={16} />
+    <span className="tooltip-wrap">
+      <button
+        type="button"
+        className="chip"
+        aria-label="Info"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Info size={16} />
+      </button>
+      {open ? <span className="tooltip-pop">{text}</span> : null}
     </span>
   );
 }
+
 
 function Pill({ active, label, onClick }) {
   return (
@@ -122,8 +166,8 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status 
       <div
         className="progress-fill"
         style={{
-          background: BRAND_BLUE,
-          opacity: 0.28,
+          background: BRAND_GREEN,
+          opacity: 0.45,
           height: `${proj * 100}%`,
           position: "absolute",
           left: 0,
@@ -311,6 +355,16 @@ export default function App() {
     return rows;
   }, [items]);
 
+  const spendingByNeedWant = useMemo(() => {
+    const need = items.filter((i) => i.needWant === "need").reduce((s, i) => s + safeNum(i.monthly), 0);
+    const want = items.filter((i) => i.needWant === "want").reduce((s, i) => s + safeNum(i.monthly), 0);
+    return [
+      { name: "Need", value: need },
+      { name: "Want", value: want },
+    ].filter((r) => r.value > 0);
+  }, [items]);
+
+
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + safeNum(a.value), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + safeNum(l.balance), 0), [liabilities]);
   const netWorth = useMemo(() => totalAssets - totalLiabilities, [totalAssets, totalLiabilities]);
@@ -461,27 +515,64 @@ export default function App() {
       {/* Header */}
       <div className="header">
         <div className="header-inner">
-          <div className="brand">
-            Ikigai
-            <Tip text="Ikigai is often translated as ‘a reason for being.’ This tool helps you understand and prioritize what is your reason for being — and how to support it over time." />
+          <div className="header-toprow">
+            <button className="btn outline" onClick={() => setDrawerOpen(true)} aria-label="Open menu">
+              <Menu size={16} />
+            </button>
+            <div className="brand">Ikigai</div>
+            <div style={{ width: 36 }} />
           </div>
 
-          <div className="nav" style={{ display: "none" }} />
-
-          <div className="nav">
+          <div className="nav" role="navigation" aria-label="Primary">
             <TabButton id="home" label="Home" Icon={HomeIcon} />
             <TabButton id="ikigai" label="Build Your Ikigai" Icon={Wallet} />
             <TabButton id="goals" label="Savings Goals" Icon={PiggyBank} />
             <TabButton id="networth" label="Net Worth" Icon={LineChartIcon} />
             <TabButton id="retirement" label="Retirement" Icon={BarChart3} />
           </div>
-
-          <button className="btn" title="Menu (coming soon)">
-            <Menu size={16} />
-            <span className="small">Menu</span>
-          </button>
         </div>
       </div>
+
+
+      {drawerOpen ? (
+        <>
+          <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
+          <div className="drawer" role="dialog" aria-label="Menu">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontWeight: 800, color: "var(--brand-green)" }}>Ikigai</div>
+              <button className="btn outline" onClick={() => setDrawerOpen(false)} aria-label="Close menu">Close</button>
+            </div>
+
+            <div className="drawer-section">
+              <h3 style={{ margin: "6px 0" }}>Navigate</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button className="btn outline" onClick={() => (setActiveTab("home"), setDrawerOpen(false))}>Home</button>
+                <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Build Your Ikigai</button>
+                <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings Goals</button>
+                <button className="btn outline" onClick={() => (setActiveTab("networth"), setDrawerOpen(false))}>Net Worth</button>
+                <button className="btn outline" onClick={() => (setActiveTab("retirement"), setDrawerOpen(false))}>Retirement</button>
+              </div>
+            </div>
+
+            <div className="drawer-section">
+              <h3 style={{ margin: "6px 0" }}>About</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Tip text="Ikigai is often translated as ‘a reason for being.’ This tool helps you understand and prioritize what is your reason for being — and how to support it over time." />
+                <div className="small" style={{ color: "var(--muted)" }}>Why “Ikigai”?</div>
+              </div>
+            </div>
+
+            <div className="drawer-section" style={{ marginTop: "auto" }}>
+              <h3 style={{ margin: "6px 0" }}>Appearance</h3>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn outline" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
+                  {theme === "dark" ? "Light mode" : "Dark mode"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <div className="container">
         {activeTab === "home" && (
@@ -540,7 +631,6 @@ export default function App() {
                         <div className="row" style={{ alignItems: "center" }}>
                           <div className="row muted small" style={{ alignItems: "center" }}>
                             <Tip text="Your stage of life shapes what ‘enough’ looks like. Nothing here is permanent." />
-                            <span>Nothing here is permanent.</span>
                           </div>
                           <button className="btn primary right" onClick={() => setOnboardingStep(2)}>Continue</button>
                         </div>
@@ -841,9 +931,12 @@ export default function App() {
                               </div>
 
                               <div className="row" style={{ alignItems: "center", gap: 8 }}>
-                                <NeedWantPill value={it.needWant} />
-                                <button className="btn" onClick={() => updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })}>
-                                  toggle
+                                <button
+                                  className="btn ghost"
+                                  onClick={() => updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })}
+                                  title="Toggle need/want"
+                                >
+                                  <NeedWantPill value={it.needWant} />
                                 </button>
                               </div>
 
@@ -867,12 +960,32 @@ export default function App() {
                     <Tip text="Pie chart shows your monthly spending split by category." />
                   </div>
 
-                  <div style={{ height: 260, marginTop: 12 }}>
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                    <Pill active={pieMode === "category"} label="By category" onClick={() => setPieMode("category")} />
+                    <Pill active={pieMode === "needwant"} label="Needs vs wants" onClick={() => setPieMode("needwant")} />
+                  </div>
+
+                  <div style={{ height: 260, marginTop: 10 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={spendingByCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90}>
-                          {spendingByCategory.map((row) => (
-                            <Cell key={row.name} fill={IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"} />
+                      <PieChart onClick={() => setPieMode((m) => (m === "category" ? "needwant" : "category"))}>
+                        <Pie
+                          data={pieMode === "category" ? spendingByCategory : spendingByNeedWant}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={55}
+                          outerRadius={90}
+                        >
+                          {(pieMode === "category" ? spendingByCategory : spendingByNeedWant).map((row) => (
+                            <Cell
+                              key={row.name}
+                              fill={
+                                pieMode === "category"
+                                  ? IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"
+                                  : row.name === "Need"
+                                  ? "rgba(47,127,111,0.75)"
+                                  : "rgba(58,159,191,0.75)"
+                              }
+                            />
                           ))}
                         </Pie>
                         <Tooltip formatter={(v) => formatMoney(Number(v))} />
@@ -1116,14 +1229,14 @@ export default function App() {
                       {formatMoney(netWorth)}
                     </div>
                   </div>
-                  <button className="btn primary right" onClick={snapshotNetWorth}><Plus size={16} /> Save snapshot</button>
+                  
                 </div>
               </div>
 
               <div className="note">
                 <div className="row" style={{ alignItems: "center" }}>
                   <div style={{ fontWeight: 800 }}>Net worth over time</div>
-                  <div className="right small muted">(Projection + investment linking comes next.)</div>
+                  <div className="right small muted">(Auto snapshots monthly. Account linking comes later.)</div>
                 </div>
                 <div style={{ height: 260, marginTop: 10 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -1173,6 +1286,7 @@ export default function App() {
                     <div className="row" style={{ alignItems: "center" }}>
                       <input
                         type="range"
+                        className="range"
                         min={2.5}
                         max={6}
                         step={0.25}
@@ -1208,3 +1322,24 @@ export default function App() {
     </div>
   );
 }
+
+  useEffect(() => {
+    localStorage.setItem("ikigai_theme", theme);
+    document.body.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+
+  useEffect(() => {
+    function applyHash() {
+      const h = (window.location.hash || "").replace("#", "");
+      if (h) setActiveTab(h);
+    }
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  useEffect(() => {
+    const h = "#" + activeTab;
+    if (window.location.hash !== h) window.history.pushState(null, "", h);
+  }, [activeTab]);
