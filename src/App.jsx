@@ -1,6 +1,4 @@
-import React, { useEffect, useMemo,
-
-  useEffect(() => {
+import React, { useEffect, useMemo, useState } from "react";
     // Auto-snapshot once per month (idempotent): updates the current month point as you edit.
     const d = new Date();
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
