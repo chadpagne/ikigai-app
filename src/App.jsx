@@ -122,55 +122,15 @@ const DEFAULT_PROFILE = {
 
 function Tip({ text }) {
   const [open, setOpen] = useState(false);
-  const btnRef = React.useRef(null);
-  const [style, setStyle] = useState(null);
+  const [pos, setPos] = useState({ top: 12, left: 12 });
 
-  useEffect(() => {
-    if (!open || !btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
-    const pad = 10;
-    const width = 260; // tooltip max width
-    let left = r.left + r.width/2 - width/2;
-    left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
-    const top = r.bottom + 10;
-    setStyle({ left, top, width });
-  }, [open]);
-
-  useEffect(() => {
-    function onDoc(e){
-      if (!open) return;
-      const t = e.target;
-      if (t && t.closest && t.closest(".tooltip-wrap")) return;
-      setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("touchstart", onDoc, { passive: true });
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("touchstart", onDoc);
-    };
-  }, [open]);
-
-  return (
-    <span className="tooltip-wrap">
-      <button
-        ref={btnRef}
-        type="button"
-        className="chip"
-        aria-label="Info"
-        onClick={() => setOpen(v => !v)}
-      >
-        <Info size={16} />
-      </button>
-      {open ? (
-        <span className="tooltip-pop" style={style}>
-          {text}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
+  function openAt(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
+    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    setPos({ left, top });
+    setOpen(true);
+  }
 
   useEffect(() => {
     function onDoc(e) {
