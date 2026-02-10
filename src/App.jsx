@@ -24,46 +24,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-    // Auto-snapshot once per month (idempotent): updates the current month point as you edit.
-    const d = new Date();
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    setNetWorthHistory((prev) => {
-      const next = Array.isArray(prev) ? [...prev] : [];
-      const idx = next.findIndex((p) => p.t === key);
-      const point = { t: key, value: netWorth };
-      if (idx >= 0) next[idx] = point;
-      else next.push(point);
-      // keep last 24 points
-      return next.slice(-24);
-    });
-  }, [netWorth]);
-import {
-  Plus,
-  Trash2,
-  Home as HomeIcon,
-  Wallet,
-  PiggyBank,
-  LineChart as LineChartIcon,
-  BarChart3,
-  Menu,
-  Info,
-  Shield,
-  Sparkles,
-  ChevronDown,
-} from "lucide-react";
 
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Tooltip,
-  Cell,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
 
 /**
  * Ikigai v0.4 (deployable)
