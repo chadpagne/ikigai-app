@@ -185,49 +185,76 @@ body.dark .range::-moz-range-track{
   border: 2px solid rgba(255,255,255,0.55);
 }
 
-  /* Reduce tile padding */
-  .tile,
-  .note {
+/* =========================
+   Layout safety + mobile tweaks
+   ========================= */
+
+/* Charts should not overflow */
+.recharts-wrapper{
+  max-width: 100% !important;
+  overflow: hidden;
+}
+
+/* Bucket tiles: make them wider & shorter */
+.progress-tile{
+  min-height: 140px;
+}
+
+/* Kill the weird blue rectangle focus outlines (keep accessible focus, but make it subtle) */
+:where(button, a, input, select, textarea):focus{
+  outline: none;
+}
+:where(button, a, input, select, textarea):focus-visible{
+  box-shadow: 0 0 0 3px var(--focus);
+  border-radius: 12px;
+}
+
+/* Fix dark-mode <option> readability (Chrome/Safari especially) */
+body.dark select option{
+  background: #0b1214;
+  color: rgba(255,255,255,0.92);
+}
+
+/* Font cleanup (improves bold rendering) */
+body{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mobile: collapse multi-column grids */
+@media (max-width: 768px){
+  .grid-2, .grid-3, .grid-4{
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Reduce tile/note padding on mobile only */
+  .tile, .note{
     padding: 14px !important;
   }
 
-  }
-
-  /* Charts should not overflow */
-  .recharts-wrapper {
-    max-width: 100% !important;
-    overflow: hidden;
-  }
-
-  /* Bucket tiles: make them wider & shorter */
-  .progress-tile {
-    min-height: 140px;
-  }
-
-  /* Prevent giant headers */
-  h1, .h1 {
+  /* Prevent giant headers on mobile */
+  h1, .h1{
     font-size: 22px;
   }
-
-  .sub {
+  .sub{
     font-size: 14px;
   }
 
   /* Navigation spacing */
-  .nav {
+  .nav{
     gap: 6px;
     overflow-x: auto;
   }
-
-  .tab {
+  .tab{
     font-size: 13px;
     padding: 8px 10px;
   }
-}
-/* Mobile: collapse multi-column grids only (do NOT touch padding/typography) */
-@media (max-width: 768px) {
-  .grid-2, .grid-3, .grid-4 {
-    grid-template-columns: 1fr !important;
+
+  /* Tooltip: prevent full-screen-feel tooltips on mobile */
+  .tooltip-pop{
+    max-width: min(280px, calc(100vw - 24px));
   }
 }
+
 
