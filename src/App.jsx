@@ -1,4 +1,29 @@
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  Plus,
+  Trash,
+  Home,
+  Wallet,
+  PiggyBank,
+  BarChart3,
+  LineChart as LineChartIcon,
+  Menu,
+  Sun,
+  Moon,
+  Info,
+} from "lucide-react";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
     // Auto-snapshot once per month (idempotent): updates the current month point as you edit.
     const d = new Date();
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -12,7 +37,6 @@ import React, { useEffect, useMemo, useState } from "react";
       return next.slice(-24);
     });
   }, [netWorth]);
- useState } from "react";
 import {
   Plus,
   Trash2,
