@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -34,8 +34,8 @@ import {
  * - localStorage persistence
  * - Guided onboarding (first time only)
  * - Tabs: Home, Build Your Ikigai, Savings Goals, Net Worth, Retirement, About
- * - Dark mode fixed for tiles + nav text
- * - Mobile tooltip clamped to viewport
+ * - Dark mode fixed for tiles + nav text (CSS patch below)
+ * - Mobile tooltip clamped to viewport (fixed here)
  * - Pie drill-down by category
  */
 
@@ -124,10 +124,28 @@ function Tip({ text }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 12, left: 12 });
 
+  // Clamp to viewport so it doesn't fly off-screen on mobile Chrome.
+  const TIP_PAD = 12;
+  const TIP_W = 280;   // matches CSS max-width patch
+  const TIP_H = 120;   // rough height estimate; top logic keeps it visible
+
   function openAt(e) {
     const r = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
-    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    const centerX = r.left + r.width / 2;
+
+    const left = Math.min(
+      window.innerWidth - TIP_PAD - TIP_W / 2,
+      Math.max(TIP_PAD + TIP_W / 2, centerX)
+    );
+
+    const below = r.bottom + 10;
+    const above = r.top - 10;
+
+    const top =
+      below + TIP_H > window.innerHeight - TIP_PAD
+        ? Math.max(TIP_PAD, above - TIP_H)
+        : Math.min(window.innerHeight - TIP_PAD, below);
+
     setPos({ left, top });
     setOpen(true);
   }
@@ -628,6 +646,9 @@ export default function App() {
         {activeTab === "home" && (
           <div className="card">
             <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* ... everything below unchanged from your version ... */}
+              {/* (kept identical to minimize risk) */}
+
               {showOnboarding ? (
                 <div style={{ maxWidth: 760 }}>
                   <div className="row" style={{ alignItems: "flex-start" }}>
@@ -828,7 +849,6 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                // HOME (post-onboarding)
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                     <div style={{ flex: 1 }}>
@@ -1122,8 +1142,8 @@ export default function App() {
                                 pieMode === "category"
                                   ? IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"
                                   : row.name === "Need"
-                                  ? "rgba(47,127,111,0.78)"
-                                  : "rgba(58,159,191,0.78)"
+                                    ? "rgba(47,127,111,0.78)"
+                                    : "rgba(58,159,191,0.78)"
                               }
                             />
                           ))}
