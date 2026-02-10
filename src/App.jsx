@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -9,18 +9,18 @@ import {
   LineChart as LineChartIcon,
   Menu,
   Info,
-  Sun,
-  Moon,
+  ChevronDown,
   Shield,
   Sparkles,
-  ChevronDown,
+  Moon,
+  Sun,
 } from "lucide-react";
 import {
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  Tooltip,
+  Tooltip as ReTooltip,
   LineChart,
   Line,
   XAxis,
@@ -29,27 +29,23 @@ import {
 } from "recharts";
 
 /**
- * Ikigai v0.4.1 (deployable)
+ * Ikigai v0.4.2 (deployable)
  * - Vite + React
  * - localStorage persistence
- * - Home guided onboarding (first time)
- * - Build Your Ikigai + Savings Goals + Net Worth + Retirement
- * - Hash routing so browser back works
- * - Tooltip "i" works on tap/click (mobile-friendly)
- * - UUID fallback for Safari/older browsers
+ * - Guided onboarding (first time only)
+ * - Tabs: Home, Build Your Ikigai, Savings Goals, Net Worth, Retirement, About
+ * - Dark mode fixed for tiles + nav text
+ * - Mobile tooltip clamped to viewport
+ * - Pie drill-down by category
  */
 
 const BRAND_GREEN = "#2f7f6f";
 const BRAND_BLUE = "#3a9fbf";
 
+// Helpers
 function uid() {
-  // Safari/iOS can be finicky depending on context. Provide a safe fallback.
-  try {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  } catch {}
-  return "id_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+  return crypto?.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
 }
-
 function safeNum(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -58,12 +54,11 @@ function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
 function formatMoney(n) {
-  const num = Number(n) || 0;
-  const abs = Math.abs(num);
-  if (abs >= 1_000_000_000) return `$${(num / 1_000_000_000).toFixed(2)}B`;
-  if (abs >= 1_000_000) return `$${(num / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `$${Math.round(num).toLocaleString()}`;
-  return `$${num.toFixed(0)}`;
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `$${Math.round(n).toLocaleString()}`;
+  return `$${n.toFixed(0)}`;
 }
 function formatPct(n, decimals = 2) {
   return `${(n * 100).toFixed(decimals)}%`;
@@ -77,9 +72,65 @@ function monthsBetween(from, toISO) {
   const b = to.getFullYear() * 12 + to.getMonth();
   return Math.max(0, b - a);
 }
+function isSameMonthKey(a, b) {
+  return a === b;
+}
+
+// Data
+const IKIGAI_CATEGORIES = [
+  { name: "Housing", color: "#7aa6a1" },
+  { name: "Car / Transportation", color: "#a0a9b8" },
+  { name: "Food & Drink", color: "#d1a06a" },
+  { name: "Utilities", color: "#8aa4c6" },
+  { name: "Insurance", color: "#93b8a0" },
+  { name: "Health & Fitness", color: "#b88fb7" },
+  { name: "Personal Care", color: "#c6a48a" },
+  { name: "Entertainment", color: "#caa1a7" },
+  { name: "Household", color: "#9fb0a2" },
+  { name: "Gifts", color: "#a8b6c7" },
+  { name: "Clothing", color: "#a8a6c7" },
+  { name: "Subscriptions", color: "#b1b1b1" },
+  { name: "Travel & Vacation", color: "#7fb6c4" },
+  { name: "Taxes", color: "#b6a07f" },
+  { name: "Education", color: "#b6a07f" },
+  { name: "Donations", color: "#9ab6c4" },
+  { name: "Debt payments", color: "#c08f7e" },
+  { name: "Fees", color: "#9e9e9e" },
+  { name: "Pet", color: "#a7b98b" },
+  { name: "Other", color: "#8f9aa7" },
+];
+
+const GOAL_PRESETS = [
+  "Emergency",
+  "Vacation",
+  "Occasion",
+  "Home down payment",
+  "Car down payment",
+  "Education",
+  "Other",
+];
+
+const DEFAULT_PROFILE = {
+  age: "",
+  location: "",
+  relationship: "",
+  kids: "0",
+  pets: "0",
+  // NOTE: monthly is string to avoid the "0 sticks while typing" issue
+  incomeSources: [{ id: uid(), name: "Salary", monthly: "" }],
+};
 
 function Tip({ text }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 12, left: 12 });
+
+  function openAt(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
+    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    setPos({ left, top });
+    setOpen(true);
+  }
 
   useEffect(() => {
     function onDoc(e) {
@@ -97,17 +148,23 @@ function Tip({ text }) {
   }, [open]);
 
   return (
-    <span className="tooltip-wrap">
+    <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
       <button
         type="button"
         className="chip"
         aria-label="Info"
-        onClick={() => setOpen((v) => !v)}
-        title="Info"
+        onClick={open ? () => setOpen(false) : openAt}
       >
         <Info size={16} />
       </button>
-      {open ? <span className="tooltip-pop">{text}</span> : null}
+      {open ? (
+        <span
+          className="tooltip-pop"
+          style={{ top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
+        >
+          {text}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -120,11 +177,11 @@ function Pill({ active, label, onClick }) {
   );
 }
 
-function NeedWantPill({ value }) {
+function NeedWantBadge({ value }) {
   const isNeed = value === "need";
   const Icon = isNeed ? Shield : Sparkles;
   return (
-    <span className={"badge " + (isNeed ? "good" : "warn")} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <span className={"badge " + (isNeed ? "good" : "warn")} title={isNeed ? "Need" : "Want"}>
       <Icon size={14} />
       {isNeed ? "Need" : "Want"}
     </span>
@@ -135,13 +192,17 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status 
   const cur = clamp01(currentPct);
   const proj = clamp01(projectedPct);
 
+  // Blue + a clearly different overlay
+  const SOLID = "rgba(58,159,191,0.28)"; // blue
+  const TINT = "rgba(58,159,191,0.72)";  // stronger blue overlay
+
   return (
-    <div className="tile progress-tile" style={{ position: "relative", overflow: "hidden" }}>
+    <div className="tile progress-tile">
       {/* current fill */}
       <div
+        className="progress-fill"
         style={{
-          background: BRAND_BLUE,
-          opacity: 0.18,
+          background: SOLID,
           height: `${cur * 100}%`,
           position: "absolute",
           left: 0,
@@ -151,21 +212,21 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status 
       />
       {/* projected overlay */}
       <div
+        className="progress-fill"
         style={{
-          background: BRAND_GREEN,
-          opacity: 0.55,
+          background: TINT,
           height: `${proj * 100}%`,
           position: "absolute",
           left: 0,
           right: 0,
           bottom: 0,
+          mixBlendMode: "multiply",
         }}
       />
-
       <div style={{ position: "relative" }}>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800 }}>{title}</div>
+            <div style={{ fontWeight: 750 }}>{title}</div>
             {subtitle ? <div className="small muted" style={{ marginTop: 4 }}>{subtitle}</div> : null}
           </div>
           <div className="row" style={{ gap: 8, alignItems: "center" }}>
@@ -174,62 +235,22 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status 
                 {status === "on_track" ? "On track" : "Behind"}
               </span>
             ) : null}
-            <div style={{ fontWeight: 900 }}>{Math.round(cur * 100)}%</div>
+            <div style={{ fontWeight: 850 }}>{Math.round(cur * 100)}%</div>
           </div>
         </div>
 
-        {footer ? <div className="small" style={{ marginTop: 10 }}>{footer}</div> : null}
-
-        <div className="small muted" style={{ marginTop: 8 }}>
-          <b>Solid</b> = what you have now. <b>Tint</b> = what your current $/mo can reach.
+        <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+          <div className="small muted">{footer ?? ""}</div>
+          <Tip text="Solid = what you have now. Tint = what your current $/mo can reach by your end date (or next 12 months)." />
         </div>
       </div>
     </div>
   );
 }
 
-const IKIGAI_CATEGORIES = [
-  { name: "Housing", color: "#7aa6a1", examples: ["Rent / Mortgage", "HOA", "Repairs"] },
-  { name: "Car / Transportation", color: "#a0a9b8", examples: ["Car payment", "Gas", "Uber / Transit"] },
-  { name: "Food & Drink", color: "#d1a06a", examples: ["Groceries", "Restaurants", "Coffee"] },
-  { name: "Utilities", color: "#8aa4c6", examples: ["Electric", "Water", "Internet"] },
-  { name: "Insurance", color: "#93b8a0", examples: ["Health", "Auto", "Home / Renters"] },
-  { name: "Health & Fitness", color: "#b88fb7", examples: ["Gym", "Therapy", "Supplements"] },
-  { name: "Personal Care", color: "#c6a48a", examples: ["Haircut", "Skincare", "Hygiene"] },
-  { name: "Entertainment", color: "#caa1a7", examples: ["Movies", "Concerts", "Hobbies"] },
-  { name: "Household", color: "#9fb0a2", examples: ["Supplies", "Furniture", "Cleaning"] },
-  { name: "Clothing", color: "#a8a6c7", examples: ["Shoes", "Basics", "Seasonal"] },
-  { name: "Subscriptions", color: "#b1b1b1", examples: ["Spotify", "Netflix", "iCloud"] },
-  { name: "Travel & Vacation", color: "#7fb6c4", examples: ["Flights", "Hotels", "Weekend trips"] },
-  { name: "Education", color: "#b6a07f", examples: ["Courses", "Books", "Tuition"] },
-  { name: "Donations", color: "#9ab6c4", examples: ["Charity", "Gifts", "Community"] },
-  { name: "Debt payments", color: "#c08f7e", examples: ["Student loan", "Credit card", "Personal loan"] },
-  { name: "Fees", color: "#9e9e9e", examples: ["Bank fees", "Parking", "Misc fees"] },
-  { name: "Pet", color: "#a7b98b", examples: ["Food", "Vet", "Grooming"] },
-  { name: "Other", color: "#8f9aa7", examples: ["Anything else", "One-offs", "Catch-all"] },
-];
-
-const GOAL_PRESETS = [
-  "Emergency",
-  "Vacation",
-  "Occasion",
-  "Home down payment",
-  "Car down payment",
-  "Education",
-  "Other",
-];
-
-const DEFAULT_PROFILE = {
-  age: "",
-  location: "",
-  relationship: "",
-  kids: 0,
-  pets: 0,
-  incomeSources: [{ id: uid(), name: "Salary", monthly: 0 }],
-};
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState("home"); // home | ikigai | goals | networth | retirement
+  // App state
+  const [activeTab, setActiveTab] = useState("home"); // home | ikigai | goals | networth | retirement | about
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [theme, setTheme] = useState(() => localStorage.getItem("ikigai_theme") || "light");
@@ -240,7 +261,6 @@ export default function App() {
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
 
   const [items, setItems] = useState([]);
-  const [pieMode, setPieMode] = useState("category"); // category | needwant
   const [quickDraft, setQuickDraft] = useState({
     name: "",
     category: "Other",
@@ -270,16 +290,34 @@ export default function App() {
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
 
+  const [pieMode, setPieMode] = useState("category"); // category | needwant
+  const [categoryFilter, setCategoryFilter] = useState(null);
+
   // Theme apply
   useEffect(() => {
     localStorage.setItem("ikigai_theme", theme);
     document.body.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  // Load state
+  // Hash routing (so browser back stays inside app)
+  useEffect(() => {
+    function applyHash() {
+      const h = (window.location.hash || "").replace("#", "");
+      if (h) setActiveTab(h);
+    }
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+  useEffect(() => {
+    const h = "#" + activeTab;
+    if (window.location.hash !== h) window.history.pushState(null, "", h);
+  }, [activeTab]);
+
+  // Load saved state
   useEffect(() => {
     try {
-      const raw = localStorage.getItem("ikigai_v04_state");
+      const raw = localStorage.getItem("ikigai_v042_state");
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed.profile) setProfile(parsed.profile);
@@ -298,7 +336,7 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem(
-        "ikigai_v04_state",
+        "ikigai_v042_state",
         JSON.stringify({ profile, items, goals, assets, liabilities, netWorthHistory, onboardingDone })
       );
     } catch {
@@ -306,25 +344,9 @@ export default function App() {
     }
   }, [profile, items, goals, assets, liabilities, netWorthHistory, onboardingDone]);
 
-  // Hash routing: support browser back
-  useEffect(() => {
-    function applyHash() {
-      const h = (window.location.hash || "").replace("#", "");
-      if (h) setActiveTab(h);
-    }
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
-  }, []);
-
-  useEffect(() => {
-    const h = "#" + activeTab;
-    if (window.location.hash !== h) window.history.pushState(null, "", h);
-  }, [activeTab]);
-
-  // Derived
+  // Derived totals
   const totalIncomeMonthly = useMemo(
-    () => (profile.incomeSources || []).reduce((s, x) => s + safeNum(x.monthly), 0),
+    () => profile.incomeSources.reduce((s, x) => s + safeNum(x.monthly), 0),
     [profile.incomeSources]
   );
 
@@ -348,12 +370,14 @@ export default function App() {
 
   const retirementTargetOngoing = useMemo(() => {
     const annual = monthlyIkigaiOngoing * 12;
-    return swr > 0 ? annual / swr : 0;
+    if (swr <= 0) return 0;
+    return annual / swr;
   }, [monthlyIkigaiOngoing, swr]);
 
   const retirementTargetAll = useMemo(() => {
     const annual = monthlyIkigaiAll * 12;
-    return swr > 0 ? annual / swr : 0;
+    if (swr <= 0) return 0;
+    return annual / swr;
   }, [monthlyIkigaiAll, swr]);
 
   const spendingByCategory = useMemo(() => {
@@ -373,22 +397,28 @@ export default function App() {
     ].filter((r) => r.value > 0);
   }, [items]);
 
+  const visibleItems = useMemo(() => {
+    if (!categoryFilter) return items;
+    return items.filter((i) => i.category === categoryFilter);
+  }, [items, categoryFilter]);
+
+  // Net worth
   const totalAssets = useMemo(() => assets.reduce((s, a) => s + safeNum(a.value), 0), [assets]);
   const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + safeNum(l.balance), 0), [liabilities]);
   const netWorth = useMemo(() => totalAssets - totalLiabilities, [totalAssets, totalLiabilities]);
 
-  // Auto-snapshot monthly (idempotent): update current month point as you edit.
+  // Auto snapshot net worth monthly (no manual button)
   useEffect(() => {
+    const key = monthKey(new Date());
     setNetWorthHistory((arr) => {
-      const key = monthKey(new Date());
-      const next = [...(arr || [])];
-      const idx = next.findIndex((x) => x.t === key);
-      if (idx >= 0) next[idx] = { t: key, value: netWorth };
-      else next.push({ t: key, value: netWorth });
+      if (arr.length > 0 && isSameMonthKey(arr[arr.length - 1].t, key)) return arr;
+      const next = [...arr, { t: key, value: netWorth }];
       return next.slice(-24);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [netWorth]);
 
+  // Goals progress
   const goalProgress = useMemo(() => {
     const now = new Date();
     return goals.map((g) => {
@@ -398,11 +428,12 @@ export default function App() {
       const mLeft = g.endDate ? monthsBetween(now, g.endDate) : null;
 
       let pct = 0; // current-only
-      let projectedPct = 0; // impact of monthly contribution
+      let projectedPct = 0; // current + monthly * horizon
       let status = null;
 
       if (target > 0) {
         pct = clamp01(current / target);
+
         const horizon = mLeft !== null ? mLeft : 12;
         projectedPct = clamp01((current + monthly * horizon) / target);
 
@@ -416,23 +447,24 @@ export default function App() {
     });
   }, [goals]);
 
-  // Mutators
+  // Mutators: profile income
   function setIncomeSource(id, patch) {
     setProfile((p) => ({
       ...p,
-      incomeSources: (p.incomeSources || []).map((x) => (x.id === id ? { ...x, ...patch } : x)),
+      incomeSources: p.incomeSources.map((x) => (x.id === id ? { ...x, ...patch } : x)),
     }));
   }
-  function addIncomeSource() {
+  function addIncomeSource(name = "Other income") {
     setProfile((p) => ({
       ...p,
-      incomeSources: [...(p.incomeSources || []), { id: uid(), name: "Other income", monthly: 0 }],
+      incomeSources: [...p.incomeSources, { id: uid(), name, monthly: "" }],
     }));
   }
   function removeIncomeSource(id) {
-    setProfile((p) => ({ ...p, incomeSources: (p.incomeSources || []).filter((x) => x.id !== id) }));
+    setProfile((p) => ({ ...p, incomeSources: p.incomeSources.filter((x) => x.id !== id) }));
   }
 
+  // Mutators: spending items
   function addQuickItem() {
     const name = quickDraft.name.trim();
     if (!name) return;
@@ -457,6 +489,7 @@ export default function App() {
     setItems((arr) => arr.filter((x) => x.id !== id));
   }
 
+  // Mutators: goals
   function addGoal() {
     const name = goalDraft.name.trim();
     if (!name) return;
@@ -481,6 +514,7 @@ export default function App() {
     setGoals((arr) => arr.filter((g) => g.id !== id));
   }
 
+  // Mutators: assets/liabilities
   function addAsset() {
     const name = assetDraft.name.trim();
     if (!name) return;
@@ -511,7 +545,6 @@ export default function App() {
   function finishOnboarding() {
     setOnboardingDone(true);
     setOnboardingStep(1);
-    setActiveTab("home");
   }
 
   function TabButton({ id, label, Icon }) {
@@ -520,17 +553,13 @@ export default function App() {
       <button
         type="button"
         className={"tab " + (active ? "active" : "")}
-        onClick={() => (setActiveTab(id), setDrawerOpen(false))}
+        onClick={() => setActiveTab(id)}
       >
         <Icon size={16} />
         {label}
       </button>
     );
   }
-
-  const categoryExamples = useMemo(() => {
-    return IKIGAI_CATEGORIES.find((c) => c.name === quickDraft.category)?.examples || [];
-  }, [quickDraft.category]);
 
   return (
     <div>
@@ -546,13 +575,12 @@ export default function App() {
               className="btn outline"
               onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
               aria-label="Toggle theme"
-              title={theme === "dark" ? "Light mode" : "Dark mode"}
+              title="Toggle theme"
             >
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
 
-          {/* Horizontal nav (desktop). On mobile it wraps. */}
           <div className="nav" role="navigation" aria-label="Primary">
             <TabButton id="home" label="Home" Icon={HomeIcon} />
             <TabButton id="ikigai" label="Build Your Ikigai" Icon={Wallet} />
@@ -563,38 +591,30 @@ export default function App() {
         </div>
       </div>
 
+      {/* Drawer */}
       {drawerOpen ? (
         <>
           <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
           <div className="drawer" role="dialog" aria-label="Menu">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <div style={{ fontWeight: 900, color: "var(--brand-green)" }}>Ikigai</div>
-              <button className="btn outline" onClick={() => setDrawerOpen(false)} aria-label="Close menu">
-                Close
-              </button>
+            <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontWeight: 850, color: "var(--text)" }}>Ikigai</div>
+              <button className="btn outline" onClick={() => setDrawerOpen(false)} aria-label="Close menu">Close</button>
             </div>
 
             <div className="drawer-section">
-              <h3 style={{ margin: "6px 0" }}>Navigate</h3>
+              <h3 style={{ margin: "8px 0" }}>Navigate</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button className="btn outline" onClick={() => (setActiveTab("home"), setDrawerOpen(false))}>Home</button>
                 <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Build Your Ikigai</button>
                 <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings Goals</button>
                 <button className="btn outline" onClick={() => (setActiveTab("networth"), setDrawerOpen(false))}>Net Worth</button>
                 <button className="btn outline" onClick={() => (setActiveTab("retirement"), setDrawerOpen(false))}>Retirement</button>
-              </div>
-            </div>
-
-            <div className="drawer-section">
-              <h3 style={{ margin: "6px 0" }}>Why “Ikigai”?</h3>
-              <div className="row" style={{ alignItems: "center", gap: 10 }}>
-                <Tip text="Ikigai is often translated as ‘a reason for being.’ This tool helps you understand and prioritize what is your reason for being — and how to support it over time." />
-                <div className="small" style={{ color: "var(--muted)" }}>Tap the icon.</div>
+                <button className="btn outline" onClick={() => (setActiveTab("about"), setDrawerOpen(false))}>About</button>
               </div>
             </div>
 
             <div className="drawer-section" style={{ marginTop: "auto" }}>
-              <h3 style={{ margin: "6px 0" }}>Appearance</h3>
+              <h3 style={{ margin: "8px 0" }}>Appearance</h3>
               <button className="btn outline" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
                 {theme === "dark" ? "Light mode" : "Dark mode"}
               </button>
@@ -619,11 +639,12 @@ export default function App() {
                   </div>
 
                   <div className="note" style={{ marginTop: 12 }}>
+                    {/* Step 1 */}
                     {onboardingStep === 1 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         <div>
                           <div className="kicker">Step 1 of 4</div>
-                          <div style={{ fontWeight: 900, fontSize: 18 }}>You</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>You</div>
                         </div>
 
                         <div className="grid-2">
@@ -631,15 +652,9 @@ export default function App() {
                             <div className="label">Age</div>
                             <input className="input" value={profile.age} onChange={(e) => setProfile({ ...profile, age: e.target.value })} />
                           </div>
-
                           <div className="field">
                             <div className="label">Location</div>
-                            <input
-                              className="input"
-                              value={profile.location}
-                              placeholder="Los Angeles, CA, USA"
-                              onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                            />
+                            <input className="input" value={profile.location} placeholder="Los Angeles, CA, USA" onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
                           </div>
 
                           <div className="field">
@@ -655,38 +670,45 @@ export default function App() {
                           <div className="grid-2" style={{ gap: 10 }}>
                             <div className="field">
                               <div className="label">Kids</div>
-                              <input className="input" type="number" value={profile.kids} onChange={(e) => setProfile({ ...profile, kids: safeNum(e.target.value) })} />
+                              <input
+                                className="input"
+                                inputMode="numeric"
+                                value={profile.kids}
+                                onChange={(e) => setProfile({ ...profile, kids: e.target.value })}
+                              />
                             </div>
                             <div className="field">
                               <div className="label">Pets</div>
                               <input
                                 className="input"
-                                type="number"
+                                inputMode="numeric"
                                 value={profile.pets}
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => setProfile({ ...profile, pets: safeNum(e.target.value) })}
+                                onChange={(e) => setProfile({ ...profile, pets: e.target.value })}
                               />
                             </div>
                           </div>
                         </div>
 
-                        <div className="row" style={{ alignItems: "center" }}>
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                           <Tip text="Your stage of life shapes what ‘enough’ looks like. Nothing here is permanent." />
-                          <button className="btn primary right" onClick={() => setOnboardingStep(2)}>Continue</button>
+                          <button className="btn primary" onClick={() => setOnboardingStep(2)}>Continue</button>
                         </div>
                       </div>
                     )}
 
+                    {/* Step 2 */}
                     {onboardingStep === 2 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         <div>
                           <div className="kicker">Step 2 of 4</div>
-                          <div style={{ fontWeight: 900, fontSize: 18 }}>What supports your life</div>
-                          <div className="small muted" style={{ marginTop: 4 }}>Add an income source, then an amount.</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>What supports your life</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>
+                            Add your income sources (monthly take-home).
+                          </div>
                         </div>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                          {(profile.incomeSources || []).map((src) => (
+                          {profile.incomeSources.map((src) => (
                             <div key={src.id} className="grid-2" style={{ gap: 10 }}>
                               <div className="field">
                                 <div className="label">Source</div>
@@ -695,9 +717,15 @@ export default function App() {
                               <div className="row" style={{ alignItems: "flex-end" }}>
                                 <div className="field" style={{ flex: 1 }}>
                                   <div className="label">Monthly</div>
-                                  <input className="input" type="number" value={src.monthly} onChange={(e) => setIncomeSource(src.id, { monthly: safeNum(e.target.value) })} />
+                                  <input
+                                    className="input"
+                                    inputMode="numeric"
+                                    value={src.monthly}
+                                    placeholder="e.g., 6500"
+                                    onChange={(e) => setIncomeSource(src.id, { monthly: e.target.value })}
+                                  />
                                 </div>
-                                {(profile.incomeSources || []).length > 1 ? (
+                                {profile.incomeSources.length > 1 ? (
                                   <button className="btn ghost" onClick={() => removeIncomeSource(src.id)} title="Remove">
                                     <Trash2 size={16} />
                                   </button>
@@ -706,33 +734,42 @@ export default function App() {
                             </div>
                           ))}
 
-                          <div className="row" style={{ alignItems: "center" }}>
-                            <button className="btn" onClick={addIncomeSource}><Plus size={16} /> Add income source</button>
-                            <div className="right small">
+                          <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                            <button className="btn" onClick={() => addIncomeSource("Other income")}><Plus size={16} /> Add income source</button>
+                            <div className="small">
                               Total monthly: <b>{formatMoney(totalIncomeMonthly)}</b>
                             </div>
+                          </div>
+
+                          <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+                            {["Dividend income", "Interest income", "Side hustle", "Bonus", "Rental income"].map((n) => (
+                              <button key={n} className="btn" onClick={() => addIncomeSource(n)}>
+                                + {n}
+                              </button>
+                            ))}
                           </div>
 
                           <div className="small muted">This doesn’t need to be perfect. You can refine it anytime.</div>
                         </div>
 
-                        <div className="row" style={{ alignItems: "center" }}>
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                           <button className="btn" onClick={() => setOnboardingStep(1)}>Back</button>
-                          <button className="btn primary right" onClick={() => setOnboardingStep(3)}>Continue</button>
+                          <button className="btn primary" onClick={() => setOnboardingStep(3)}>Continue</button>
                         </div>
                       </div>
                     )}
 
+                    {/* Step 3 */}
                     {onboardingStep === 3 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         <div>
                           <div className="kicker">Step 3 of 4</div>
-                          <div style={{ fontWeight: 900, fontSize: 18 }}>What matters today</div>
-                          <div className="small muted" style={{ marginTop: 4 }}>Pick a category to start adding items.</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>What matters today</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>Start with a few things that feel important.</div>
                         </div>
 
                         <div className="grid-2">
-                          {["Housing", "Food & Drink", "Car / Transportation", "Other"].map((c) => (
+                          {["Housing", "Food & Drink", "Car / Transportation", "Pet"].map((c) => (
                             <button
                               key={c}
                               className="tile"
@@ -742,28 +779,29 @@ export default function App() {
                               }}
                               style={{ textAlign: "left", cursor: "pointer" }}
                             >
-                              <div style={{ fontWeight: 900 }}>{c}</div>
+                              <div style={{ fontWeight: 850 }}>{c}</div>
                               <div className="small muted" style={{ marginTop: 6 }}>Tap to add</div>
                             </button>
                           ))}
                         </div>
 
-                        <div className="row" style={{ alignItems: "center" }}>
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                           <button className="btn" onClick={() => setOnboardingStep(2)}>Back</button>
-                          <button className="btn primary right" onClick={() => setOnboardingStep(4)}>Continue</button>
+                          <button className="btn primary" onClick={() => setOnboardingStep(4)}>Continue</button>
                         </div>
                       </div>
                     )}
 
+                    {/* Step 4 */}
                     {onboardingStep === 4 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                         <div>
                           <div className="kicker">Step 4 of 4</div>
-                          <div style={{ fontWeight: 900, fontSize: 18 }}>Looking ahead</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>Looking ahead</div>
                           <div className="small muted" style={{ marginTop: 4 }}>Some parts of life are worth planning for.</div>
                         </div>
 
-                        <div className="row">
+                        <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
                           <button
                             className="btn primary"
                             onClick={() => {
@@ -776,17 +814,23 @@ export default function App() {
                           <button className="btn" onClick={finishOnboarding}>Skip for now</button>
                         </div>
 
-                        <div className="row small muted" style={{ alignItems: "center" }}>
-                          <Tip text="Ikigai doesn’t tell people what to do. It shows them what their life implies — and lets them decide." />
-                          <span>Nothing here is permanent.</span>
+                        <div className="row small muted" style={{ alignItems: "center", gap: 10 }}>
+                          <Tip text="Planning doesn’t mean committing — it means seeing." />
+                          <span>Planning doesn’t mean committing — it means seeing.</span>
+                        </div>
+
+                        <div className="note">
+                          <div style={{ fontWeight: 850 }}>Your Ikigai is taking shape.</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>You can change any of this as life changes.</div>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
+                // HOME (post-onboarding)
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div className="row" style={{ alignItems: "flex-start" }}>
+                  <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                     <div style={{ flex: 1 }}>
                       <h2 className="h1">Home</h2>
                       <p className="sub">A calm snapshot of your life right now.</p>
@@ -798,50 +842,52 @@ export default function App() {
 
                   <div className="grid-4">
                     <div className="tile">
-                      <div className="row" style={{ alignItems: "center" }}>
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Spending</div>
-                        <div className="right">
-                          <Tip text="This reflects your current life — not a rule you must follow forever." />
-                        </div>
+                        <Tip text="This reflects your current life — not a rule you must follow forever." />
                       </div>
                       <div
                         className="big-number"
                         onClick={() => setSpendingView((v) => (v === "monthly" ? "annual" : "monthly"))}
                         title="Toggle monthly/annual"
-                        style={{ cursor: "pointer" }}
                       >
                         {formatMoney(monthlySpendForSummary)}
-                        <small>{spendingView === "monthly" ? "Monthly" : "Annual"} <ChevronDown size={12} /></small>
+                        <small>
+                          {spendingView === "monthly" ? "Monthly" : "Annual"} <ChevronDown size={12} />
+                        </small>
                       </div>
                     </div>
 
                     <div className="tile">
-                      <div className="row" style={{ alignItems: "center" }}>
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Savings rate</div>
-                        <div className="right"><Tip text="This naturally changes as priorities and seasons shift." /></div>
+                        <Tip text="This naturally changes as priorities and seasons shift." />
                       </div>
                       <div className="big-number" style={{ cursor: "default" }}>{formatPct(savingsRate, 2)}</div>
                     </div>
 
                     <div className="tile">
-                      <div className="row" style={{ alignItems: "center" }}>
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Leftover money</div>
-                        <div className="right"><Tip text="This is the part of your money you actively choose how to direct." /></div>
+                        <Tip text="This is the part of your money you actively choose how to direct." />
                       </div>
                       <div className="big-number" style={{ cursor: "default" }}>{formatMoney(leftoverMonthly)}</div>
-                      <div className="small muted">Based on monthly income – monthly spending.</div>
+                      <div className="small muted">Monthly income − monthly spending.</div>
                     </div>
 
                     <div className="tile">
-                      <div className="row" style={{ alignItems: "center" }}>
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Retirement target</div>
-                        <div className="right"><Tip text="This adjusts as your Ikigai evolves." /></div>
+                        <Tip text="This adjusts as your Ikigai evolves." />
                       </div>
 
-                      <div className="row" style={{ marginTop: 10 }}>
-                        <Pill active={retirementView === "ongoing"} label="Ongoing" onClick={() => setRetirementView("ongoing")} />
-                        <Pill active={retirementView === "all"} label="Incl. temp" onClick={() => setRetirementView("all")} />
-                      </div>
+                      <button
+                        className="btn"
+                        style={{ marginTop: 10 }}
+                        onClick={() => setRetirementView((v) => (v === "ongoing" ? "all" : "ongoing"))}
+                      >
+                        {retirementView === "ongoing" ? "Ongoing (tap to include temporary)" : "Including temporary (tap for ongoing)"}
+                      </button>
 
                       <div className="big-number" style={{ cursor: "default" }}>
                         {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
@@ -851,23 +897,23 @@ export default function App() {
                   </div>
 
                   <div className="note">
-                    <div className="small" style={{ color: "rgba(0,0,0,0.78)" }}>
-                      This is a mirror, not a grade. Life shifts — and your numbers will too.
+                    <div className="small">
+                      This is a mirror, not a grade. You’re seeing what your life implies — and you get to decide what changes, if any.
                     </div>
                   </div>
 
                   <div className="grid-3">
                     <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("ikigai")}>
-                      <div style={{ fontWeight: 900 }}>Build Your Ikigai</div>
+                      <div style={{ fontWeight: 850 }}>Build Your Ikigai</div>
                       <div className="small muted" style={{ marginTop: 6 }}>Refine how spending reflects what matters.</div>
                     </button>
                     <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("goals")}>
-                      <div style={{ fontWeight: 900 }}>Savings Goals</div>
-                      <div className="small muted" style={{ marginTop: 6 }}>See how today changes your timeline.</div>
+                      <div style={{ fontWeight: 850 }}>Savings Goals</div>
+                      <div className="small muted" style={{ marginTop: 6 }}>See how today’s choices affect future plans.</div>
                     </button>
-                    <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("networth")}>
-                      <div style={{ fontWeight: 900 }}>Net Worth</div>
-                      <div className="small muted" style={{ marginTop: 6 }}>Watch everything connect over time.</div>
+                    <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("about")}>
+                      <div style={{ fontWeight: 850 }}>About</div>
+                      <div className="small muted" style={{ marginTop: 6 }}>What “Ikigai” means here.</div>
                     </button>
                   </div>
                 </div>
@@ -885,30 +931,15 @@ export default function App() {
                 <p className="sub">Some parts of life are essential. Others bring meaning. Most are a mix.</p>
               </div>
 
-              <div className="row" style={{ flexWrap: "wrap" }}>
-                {IKIGAI_CATEGORIES.slice(0, 10).map((c) => (
-                  <button
-                    key={c.name}
-                    className="btn"
-                    onClick={() => setQuickDraft((d) => ({ ...d, category: c.name }))}
-                    style={{ borderRadius: 999 }}
-                    title={c.name}
-                  >
-                    <span style={{ width: 10, height: 10, borderRadius: 999, background: c.color, display: "inline-block" }} />
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-
               <div className="note">
-                <div className="row" style={{ alignItems: "flex-start" }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 900 }}>Quick Add</div>
+                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontWeight: 850 }}>Quick Add</div>
                     <div className="small muted" style={{ marginTop: 4 }}>
-                      Examples for <b>{quickDraft.category}</b>: {categoryExamples.join(", ")}
+                      Add one item at a time. Everything updates instantly.
                     </div>
                   </div>
-                  <Tip text="Add a real item and see everything update instantly." />
+                  <Tip text="Examples: Groceries, Gas, Gym, Coffee, Rent, Pet food, Streaming." />
                 </div>
 
                 <div className="grid-2" style={{ marginTop: 12 }}>
@@ -918,21 +949,32 @@ export default function App() {
                       className="input"
                       value={quickDraft.name}
                       onChange={(e) => setQuickDraft((d) => ({ ...d, name: e.target.value }))}
-                      placeholder={categoryExamples[0] || "Groceries, Gas, Gym, Coffee"}
+                      placeholder="Groceries, Gas, Gym, Coffee"
                     />
                   </div>
 
                   <div className="grid-2" style={{ gap: 10 }}>
                     <div className="field">
                       <div className="label">Category</div>
-                      <select value={quickDraft.category} onChange={(e) => setQuickDraft((d) => ({ ...d, category: e.target.value }))}>
-                        {IKIGAI_CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
+                      <select
+                        value={quickDraft.category}
+                        onChange={(e) => setQuickDraft((d) => ({ ...d, category: e.target.value }))}
+                      >
+                        {IKIGAI_CATEGORIES.map((c) => (
+                          <option key={c.name}>{c.name}</option>
+                        ))}
                       </select>
                     </div>
 
                     <div className="field">
                       <div className="label">Monthly</div>
-                      <input className="input" type="number" value={quickDraft.monthly} onChange={(e) => setQuickDraft((d) => ({ ...d, monthly: e.target.value }))} placeholder="$" />
+                      <input
+                        className="input"
+                        inputMode="numeric"
+                        value={quickDraft.monthly}
+                        onChange={(e) => setQuickDraft((d) => ({ ...d, monthly: e.target.value }))}
+                        placeholder="e.g., 450"
+                      />
                     </div>
                   </div>
                 </div>
@@ -940,55 +982,89 @@ export default function App() {
                 <div className="grid-2" style={{ marginTop: 10 }}>
                   <div className="field">
                     <div className="label">Need / Want</div>
-                    <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-                      <Pill active={quickDraft.needWant === "need"} label="Need" onClick={() => setQuickDraft((d) => ({ ...d, needWant: "need" }))} />
-                      <Pill active={quickDraft.needWant === "want"} label="Want" onClick={() => setQuickDraft((d) => ({ ...d, needWant: "want" }))} />
-                    </div>
+                    <select
+                      value={quickDraft.needWant}
+                      onChange={(e) => setQuickDraft((d) => ({ ...d, needWant: e.target.value }))}
+                    >
+                      <option value="need">Need</option>
+                      <option value="want">Want</option>
+                    </select>
                   </div>
 
-                  <div className="row" style={{ alignItems: "flex-end" }}>
-                    <label className="row small" style={{ alignItems: "center" }}>
-                      <input type="checkbox" checked={quickDraft.temporary} onChange={(e) => setQuickDraft((d) => ({ ...d, temporary: e.target.checked }))} />
+                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
+                    <label className="row small" style={{ alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={quickDraft.temporary}
+                        onChange={(e) => setQuickDraft((d) => ({ ...d, temporary: e.target.checked }))}
+                      />
                       Temporary
                     </label>
 
                     {quickDraft.temporary ? (
                       <div className="field" style={{ flex: 1 }}>
                         <div className="label">Ends (optional)</div>
-                        <input className="input" type="date" value={quickDraft.endDate} onChange={(e) => setQuickDraft((d) => ({ ...d, endDate: e.target.value }))} />
+                        <input
+                          className="input"
+                          type="date"
+                          value={quickDraft.endDate}
+                          onChange={(e) => setQuickDraft((d) => ({ ...d, endDate: e.target.value }))}
+                        />
                       </div>
                     ) : null}
 
-                    <button className="btn primary right" onClick={addQuickItem}><Plus size={16} /> Add</button>
+                    <button className="btn primary right" onClick={addQuickItem}>
+                      <Plus size={16} /> Add
+                    </button>
                   </div>
                 </div>
               </div>
 
               <div className="grid-2">
+                {/* Left: item list */}
                 <div>
-                  <div className="row" style={{ alignItems: "center" }}>
-                    <div style={{ fontWeight: 900 }}>What you currently spend on</div>
-                    <div className="right"><Tip text="This is a mirror, not a grade. You can change anything." /></div>
+                  <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                    <Tip text="This is a mirror, not a grade. You can change anything." />
                   </div>
 
+                  {categoryFilter ? (
+                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+                      <div className="small">
+                        Showing category: <b>{categoryFilter}</b>
+                      </div>
+                      <button className="btn" onClick={() => setCategoryFilter(null)}>Clear</button>
+                    </div>
+                  ) : null}
+
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-                    {items.length === 0 ? (
+                    {visibleItems.length === 0 ? (
                       <div className="tile muted">No items yet. Add a few to bring your Ikigai to life.</div>
                     ) : (
-                      items.map((it) => (
-                        <div key={it.id} className="tile" style={{ background: "rgba(255,255,255,0.85)" }}>
+                      visibleItems.map((it) => (
+                        <div key={it.id} className="tile">
                           <div className="grid-2" style={{ gap: 10 }}>
                             <div>
-                              <input className="input" value={it.name} onChange={(e) => updateItem(it.id, { name: e.target.value })} />
+                              <input
+                                className="input"
+                                value={it.name}
+                                onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                              />
                               <div className="small muted" style={{ marginTop: 6 }}>
-                                {it.category}{it.temporary ? " • Temporary" : ""}
+                                {it.category}
+                                {it.temporary ? " • Temporary" : ""}
                               </div>
                             </div>
 
-                            <div className="row" style={{ alignItems: "flex-end" }}>
+                            <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
                               <div className="field" style={{ flex: 1 }}>
                                 <div className="label">Monthly</div>
-                                <input className="input" type="number" value={it.monthly} onChange={(e) => updateItem(it.id, { monthly: safeNum(e.target.value) })} />
+                                <input
+                                  className="input"
+                                  inputMode="numeric"
+                                  value={String(it.monthly)}
+                                  onChange={(e) => updateItem(it.id, { monthly: safeNum(e.target.value) })}
+                                />
                               </div>
 
                               <button
@@ -996,7 +1072,7 @@ export default function App() {
                                 onClick={() => updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })}
                                 title="Toggle need/want"
                               >
-                                <NeedWantPill value={it.needWant} />
+                                <NeedWantBadge value={it.needWant} />
                               </button>
 
                               <button className="btn ghost" onClick={() => removeItem(it.id)} title="Remove">
@@ -1010,29 +1086,34 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="tile" style={{ background: "rgba(255,255,255,0.85)" }}>
-                  <div className="row" style={{ alignItems: "flex-start" }}>
+                {/* Right: summary pie */}
+                <div className="tile">
+                  <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 900 }}>Summary</div>
-                      <div className="small muted" style={{ marginTop: 4 }}>Tap the pie to toggle views.</div>
+                      <div style={{ fontWeight: 850 }}>Summary</div>
+                      <div className="small muted" style={{ marginTop: 4 }}>A simple story of where your money goes.</div>
                     </div>
-                    <Tip text="Click the pie chart itself to toggle between category and needs vs wants." />
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                     <Pill active={pieMode === "category"} label="By category" onClick={() => setPieMode("category")} />
-                    <Pill active={pieMode === "needwant"} label="Needs vs wants" onClick={() => setPieMode("needwant")} />
+                    <Pill active={pieMode === "needwant"} label="Needs vs. Wants" onClick={() => setPieMode("needwant")} />
                   </div>
 
                   <div style={{ height: 260, marginTop: 10 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart onClick={() => setPieMode((m) => (m === "category" ? "needwant" : "category"))}>
+                      <PieChart>
                         <Pie
                           data={pieMode === "category" ? spendingByCategory : spendingByNeedWant}
                           dataKey="value"
                           nameKey="name"
                           innerRadius={55}
                           outerRadius={90}
+                          onClick={(data) => {
+                            // Drill down only for category mode
+                            if (pieMode !== "category") return;
+                            if (data?.name) setCategoryFilter(data.name);
+                          }}
                         >
                           {(pieMode === "category" ? spendingByCategory : spendingByNeedWant).map((row) => (
                             <Cell
@@ -1041,13 +1122,13 @@ export default function App() {
                                 pieMode === "category"
                                   ? IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"
                                   : row.name === "Need"
-                                    ? "rgba(47,127,111,0.90)"
-                                    : "rgba(58,159,191,0.90)"
+                                  ? "rgba(47,127,111,0.78)"
+                                  : "rgba(58,159,191,0.78)"
                               }
                             />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(v) => formatMoney(Number(v))} />
+                        <ReTooltip formatter={(v) => formatMoney(Number(v))} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -1055,26 +1136,43 @@ export default function App() {
                   <div className="small" style={{ marginTop: 6 }}>
                     Monthly total: <b>{formatMoney(monthlyIkigaiAll)}</b>
                   </div>
+
+                  {pieMode === "category" ? (
+                    <div className="small muted" style={{ marginTop: 8 }}>
+                      Tip: tap a slice to drill into that category.
+                    </div>
+                  ) : null}
                 </div>
+              </div>
+
+              <div className="row" style={{ justifyContent: "flex-end" }}>
+                <button className="btn primary" onClick={() => setActiveTab("goals")}>
+                  Next: Savings Goals →
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* GOALS */}
+        {/* SAVINGS GOALS */}
         {activeTab === "goals" && (
           <div className="card">
             <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <h2 className="h1">Savings Goals</h2>
-                <p className="sub">Progress should feel clear: what you have now — and how $/mo changes the future.</p>
+                <p className="sub">Progress should feel clear: what you have now — and how your monthly saving changes the future.</p>
               </div>
 
               <div className="note">
                 <div className="grid-2">
                   <div className="field">
                     <div className="label">Name</div>
-                    <input className="input" value={goalDraft.name} onChange={(e) => setGoalDraft((d) => ({ ...d, name: e.target.value }))} placeholder="Emergency fund" />
+                    <input
+                      className="input"
+                      value={goalDraft.name}
+                      onChange={(e) => setGoalDraft((d) => ({ ...d, name: e.target.value }))}
+                      placeholder="Emergency fund"
+                    />
                   </div>
                   <div className="grid-2" style={{ gap: 10 }}>
                     <div className="field">
@@ -1085,7 +1183,7 @@ export default function App() {
                     </div>
                     <div className="field">
                       <div className="label">Target</div>
-                      <input className="input" type="number" value={goalDraft.target} onChange={(e) => setGoalDraft((d) => ({ ...d, target: e.target.value }))} />
+                      <input className="input" inputMode="numeric" value={goalDraft.target} onChange={(e) => setGoalDraft((d) => ({ ...d, target: e.target.value }))} />
                     </div>
                   </div>
                 </div>
@@ -1094,14 +1192,14 @@ export default function App() {
                   <div className="grid-2" style={{ gap: 10 }}>
                     <div className="field">
                       <div className="label">Current</div>
-                      <input className="input" type="number" value={goalDraft.current} onChange={(e) => setGoalDraft((d) => ({ ...d, current: e.target.value }))} />
+                      <input className="input" inputMode="numeric" value={goalDraft.current} onChange={(e) => setGoalDraft((d) => ({ ...d, current: e.target.value }))} />
                     </div>
                     <div className="field">
                       <div className="label">$ / month</div>
-                      <input className="input" type="number" value={goalDraft.monthly} onChange={(e) => setGoalDraft((d) => ({ ...d, monthly: e.target.value }))} />
+                      <input className="input" inputMode="numeric" value={goalDraft.monthly} onChange={(e) => setGoalDraft((d) => ({ ...d, monthly: e.target.value }))} />
                     </div>
                   </div>
-                  <div className="row" style={{ alignItems: "flex-end" }}>
+                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
                     <div className="field" style={{ flex: 1 }}>
                       <div className="label">End date (optional)</div>
                       <input className="input" type="date" value={goalDraft.endDate} onChange={(e) => setGoalDraft((d) => ({ ...d, endDate: e.target.value }))} />
@@ -1116,7 +1214,7 @@ export default function App() {
               </div>
 
               {goals.length === 0 ? (
-                <div className="tile muted">No goals yet. Add one to see the bucket fill.</div>
+                <div className="tile muted">No goals yet. Add one to see progress.</div>
               ) : (
                 <div className="grid-3">
                   {goals.map((g) => {
@@ -1149,18 +1247,18 @@ export default function App() {
                           <div className="grid-2">
                             <div className="field">
                               <div className="label">Target</div>
-                              <input className="input" type="number" value={g.target} onChange={(e) => updateGoal(g.id, { target: safeNum(e.target.value) })} />
+                              <input className="input" inputMode="numeric" value={g.target} onChange={(e) => updateGoal(g.id, { target: safeNum(e.target.value) })} />
                             </div>
                             <div className="field">
                               <div className="label">Current</div>
-                              <input className="input" type="number" value={g.current} onChange={(e) => updateGoal(g.id, { current: safeNum(e.target.value) })} />
+                              <input className="input" inputMode="numeric" value={g.current} onChange={(e) => updateGoal(g.id, { current: safeNum(e.target.value) })} />
                             </div>
                           </div>
 
                           <div className="grid-2" style={{ marginTop: 10 }}>
                             <div className="field">
                               <div className="label">$ / month</div>
-                              <input className="input" type="number" value={g.monthly} onChange={(e) => updateGoal(g.id, { monthly: safeNum(e.target.value) })} />
+                              <input className="input" inputMode="numeric" value={g.monthly} onChange={(e) => updateGoal(g.id, { monthly: safeNum(e.target.value) })} />
                             </div>
                             <div className="field">
                               <div className="label">End date</div>
@@ -1168,8 +1266,8 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="row" style={{ marginTop: 10 }}>
-                            <button className="btn right" onClick={() => removeGoal(g.id)} title="Remove">
+                          <div className="row" style={{ marginTop: 10, justifyContent: "flex-end" }}>
+                            <button className="btn" onClick={() => removeGoal(g.id)} title="Remove">
                               <Trash2 size={16} /> Remove
                             </button>
                           </div>
@@ -1189,12 +1287,12 @@ export default function App() {
             <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <h2 className="h1">Net Worth</h2>
-                <p className="sub">Add assets and liabilities—net worth updates automatically (snapshots monthly).</p>
+                <p className="sub">Add assets and liabilities—net worth updates automatically. (Account linking comes later.)</p>
               </div>
 
               <div className="grid-2">
                 <div className="note">
-                  <div style={{ fontWeight: 900 }}>Assets (includes investments)</div>
+                  <div style={{ fontWeight: 850 }}>Assets (includes investments)</div>
                   <div className="divider" />
                   <div className="grid-2" style={{ gap: 10 }}>
                     <div className="field">
@@ -1203,10 +1301,10 @@ export default function App() {
                     </div>
                     <div className="field">
                       <div className="label">Value</div>
-                      <input className="input" type="number" value={assetDraft.value} onChange={(e) => setAssetDraft({ ...assetDraft, value: e.target.value })} placeholder="$" />
+                      <input className="input" inputMode="numeric" value={assetDraft.value} onChange={(e) => setAssetDraft({ ...assetDraft, value: e.target.value })} placeholder="e.g., 250000" />
                     </div>
                   </div>
-                  <div className="row" style={{ marginTop: 10 }}>
+                  <div className="row" style={{ marginTop: 10, gap: 10 }}>
                     <div className="field" style={{ flex: 1 }}>
                       <div className="label">Type</div>
                       <select value={assetDraft.type} onChange={(e) => setAssetDraft({ ...assetDraft, type: e.target.value })}>
@@ -1217,17 +1315,17 @@ export default function App() {
                         <option>Other</option>
                       </select>
                     </div>
-                    <button className="btn primary right" onClick={addAsset}><Plus size={16} /> Add</button>
+                    <button className="btn primary" onClick={addAsset}><Plus size={16} /> Add</button>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
                     {assets.length === 0 ? <div className="muted small">No assets yet.</div> : null}
                     {assets.map((a) => (
-                      <div key={a.id} className="tile" style={{ background: "white" }}>
+                      <div key={a.id} className="tile">
                         <div className="grid-2" style={{ gap: 10 }}>
                           <input className="input" value={a.name} onChange={(e) => updateAsset(a.id, "name", e.target.value)} />
-                          <div className="row" style={{ alignItems: "center" }}>
-                            <input className="input" type="number" value={a.value} onChange={(e) => updateAsset(a.id, "value", safeNum(e.target.value))} style={{ flex: 1 }} />
+                          <div className="row" style={{ alignItems: "center", gap: 10 }}>
+                            <input className="input" inputMode="numeric" value={String(a.value)} onChange={(e) => updateAsset(a.id, "value", safeNum(e.target.value))} style={{ flex: 1 }} />
                             <button className="btn ghost" onClick={() => removeAsset(a.id)} title="Remove"><Trash2 size={16} /></button>
                           </div>
                         </div>
@@ -1238,30 +1336,30 @@ export default function App() {
                 </div>
 
                 <div className="note">
-                  <div style={{ fontWeight: 900 }}>Liabilities</div>
+                  <div style={{ fontWeight: 850 }}>Liabilities</div>
                   <div className="divider" />
                   <div className="grid-2" style={{ gap: 10 }}>
                     <div className="field">
                       <div className="label">Name</div>
-                      <input className="input" value={liabDraft.name} onChange={(e) => setLiabDraft({ ...liabDraft, name: e.target.value })} placeholder="Mortgage, Student loan, Credit card" />
+                      <input className="input" value={liabDraft.name} onChange={(e) => setLiabDraft({ ...liabDraft, name: e.target.value })} placeholder="Mortgage, Student loan" />
                     </div>
                     <div className="field">
                       <div className="label">Balance</div>
-                      <input className="input" type="number" value={liabDraft.balance} onChange={(e) => setLiabDraft({ ...liabDraft, balance: e.target.value })} placeholder="$" />
+                      <input className="input" inputMode="numeric" value={liabDraft.balance} onChange={(e) => setLiabDraft({ ...liabDraft, balance: e.target.value })} placeholder="e.g., 180000" />
                     </div>
                   </div>
-                  <div className="row" style={{ marginTop: 10 }}>
-                    <button className="btn primary right" onClick={addLiability}><Plus size={16} /> Add</button>
+                  <div className="row" style={{ marginTop: 10, justifyContent: "flex-end" }}>
+                    <button className="btn primary" onClick={addLiability}><Plus size={16} /> Add</button>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
                     {liabilities.length === 0 ? <div className="muted small">No liabilities yet.</div> : null}
                     {liabilities.map((l) => (
-                      <div key={l.id} className="tile" style={{ background: "white" }}>
+                      <div key={l.id} className="tile">
                         <div className="grid-2" style={{ gap: 10 }}>
                           <input className="input" value={l.name} onChange={(e) => updateLiability(l.id, "name", e.target.value)} />
-                          <div className="row" style={{ alignItems: "center" }}>
-                            <input className="input" type="number" value={l.balance} onChange={(e) => updateLiability(l.id, "balance", safeNum(e.target.value))} style={{ flex: 1 }} />
+                          <div className="row" style={{ alignItems: "center", gap: 10 }}>
+                            <input className="input" inputMode="numeric" value={String(l.balance)} onChange={(e) => updateLiability(l.id, "balance", safeNum(e.target.value))} style={{ flex: 1 }} />
                             <button className="btn ghost" onClick={() => removeLiability(l.id)} title="Remove"><Trash2 size={16} /></button>
                           </div>
                         </div>
@@ -1287,13 +1385,12 @@ export default function App() {
                 <div className="big-number" style={{ cursor: "default", color: netWorth < 0 ? "#ef4444" : "#16a34a" }}>
                   {formatMoney(netWorth)}
                 </div>
-                <div className="small muted">Tracked monthly automatically.</div>
               </div>
 
               <div className="note">
-                <div className="row" style={{ alignItems: "center" }}>
-                  <div style={{ fontWeight: 900 }}>Net worth over time</div>
-                  <div className="right small muted">(Account linking comes later.)</div>
+                <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontWeight: 850 }}>Net worth over time</div>
+                  <div className="small muted">(Auto snapshots monthly. Account linking comes later.)</div>
                 </div>
                 <div style={{ height: 260, marginTop: 10 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -1301,7 +1398,7 @@ export default function App() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="t" />
                       <YAxis tickFormatter={(v) => `$${Math.round(Number(v) / 1000)}k`} />
-                      <Tooltip formatter={(v) => formatMoney(Number(v))} />
+                      <ReTooltip formatter={(v) => formatMoney(Number(v))} />
                       <Line type="monotone" dataKey="value" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -1321,27 +1418,30 @@ export default function App() {
               </div>
 
               <div className="note">
-                <div className="row" style={{ alignItems: "flex-start" }}>
+                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 900 }}>Retirement target</div>
+                    <div style={{ fontWeight: 850 }}>Retirement target</div>
                     <div className="small muted" style={{ marginTop: 4 }}>Toggle whether to include temporary items.</div>
                   </div>
                   <Tip text="This is a simple, high-level target. We can add a timeline and inflation next." />
                 </div>
 
-                <div className="row" style={{ marginTop: 10 }}>
-                  <Pill active={retirementView === "ongoing"} label="Ongoing" onClick={() => setRetirementView("ongoing")} />
-                  <Pill active={retirementView === "all"} label="Incl. temporary" onClick={() => setRetirementView("all")} />
-                </div>
+                <button
+                  className="btn"
+                  style={{ marginTop: 12 }}
+                  onClick={() => setRetirementView((v) => (v === "ongoing" ? "all" : "ongoing"))}
+                >
+                  {retirementView === "ongoing" ? "Ongoing (tap to include temporary)" : "Including temporary (tap for ongoing)"}
+                </button>
 
-                <div className="big-number" style={{ cursor: "default", marginTop: 8 }}>
+                <div className="big-number" style={{ cursor: "default", marginTop: 10 }}>
                   {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
                 </div>
 
                 <div className="grid-2" style={{ marginTop: 14 }}>
                   <div className="field">
                     <div className="label">Withdrawal rate</div>
-                    <div className="row" style={{ alignItems: "center" }}>
+                    <div className="row" style={{ alignItems: "center", gap: 10 }}>
                       <input
                         type="range"
                         className="range"
@@ -1354,7 +1454,8 @@ export default function App() {
                       />
                       <input
                         className="input"
-                        style={{ width: 90 }}
+                        style={{ width: 92 }}
+                        inputMode="decimal"
                         value={(swr * 100).toFixed(2)}
                         onChange={(e) => setSwr(safeNum(e.target.value) / 100)}
                       />
@@ -1367,9 +1468,9 @@ export default function App() {
 
                   <div className="tile">
                     <div className="small muted">Monthly spending (all)</div>
-                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 6 }}>{formatMoney(monthlyIkigaiAll)}</div>
+                    <div style={{ fontWeight: 850, fontSize: 18, marginTop: 6 }}>{formatMoney(monthlyIkigaiAll)}</div>
                     <div className="small muted" style={{ marginTop: 14 }}>Monthly spending (ongoing)</div>
-                    <div style={{ fontWeight: 900, fontSize: 18, marginTop: 6 }}>{formatMoney(monthlyIkigaiOngoing)}</div>
+                    <div style={{ fontWeight: 850, fontSize: 18, marginTop: 6 }}>{formatMoney(monthlyIkigaiOngoing)}</div>
                   </div>
                 </div>
               </div>
@@ -1377,6 +1478,42 @@ export default function App() {
           </div>
         )}
 
+        {/* ABOUT */}
+        {activeTab === "about" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 820 }}>
+              <h2 className="h1">About</h2>
+              <p className="sub">
+                Ikigai is often translated as “a reason for being” — what gets you up in the morning.
+              </p>
+
+              <div className="note">
+                <div style={{ fontWeight: 850, marginBottom: 6 }}>What Ikigai means in this app</div>
+                <div className="small">
+                  Financial planning is rarely just about money. It’s about funding what matters to you.
+                  Ikigai doesn’t tell people what to do. It shows them what their life implies — and lets them decide.
+                </div>
+              </div>
+
+              <div className="note">
+                <div style={{ fontWeight: 850, marginBottom: 6 }}>Tone and intent</div>
+                <div className="small">
+                  We aim for calm and reassuring — realistic but supportive. Life changes; budgets aren’t moral report cards.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* First-time only: finish onboarding button (when they’re done) */}
+        {!onboardingDone && activeTab !== "home" ? (
+          <div className="note" style={{ marginTop: 14 }}>
+            <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+              <div className="small muted">Still onboarding? You can finish anytime.</div>
+              <button className="btn" onClick={finishOnboarding}>Mark onboarding done</button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
