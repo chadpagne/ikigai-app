@@ -1,33 +1,47 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo,
+
+  useEffect(() => {
+    // Auto-snapshot once per month (idempotent): updates the current month point as you edit.
+    const d = new Date();
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    setNetWorthHistory((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [];
+      const idx = next.findIndex((p) => p.t === key);
+      const point = { t: key, value: netWorth };
+      if (idx >= 0) next[idx] = point;
+      else next.push(point);
+      // keep last 24 points
+      return next.slice(-24);
+    });
+  }, [netWorth]);
+ useState } from "react";
 import {
   Plus,
   Trash2,
   Home as HomeIcon,
   Wallet,
   PiggyBank,
-  BarChart3,
   LineChart as LineChartIcon,
+  BarChart3,
   Menu,
-  Sun,
-  Moon,
   Info,
-  ChevronDown,
   Shield,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
+
 import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
   Tooltip,
+  Cell,
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
 } from "recharts";
-
 
 /**
  * Ikigai v0.4 (deployable)
@@ -261,31 +275,7 @@ export default function App() {
   const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem("ikigai_theme") || "light");
-  const [pieMode, setPieMode] = useState("category");
 
-
-useEffect(() => {
-  localStorage.setItem("ikigai_theme", theme);
-  document.body.classList.toggle("dark", theme === "dark");
-}, [theme]);
-
-useEffect(() => {
-  function applyHash() {
-    const h = (window.location.hash || "").replace("#", "");
-    if (h) setActiveTab(h);
-  }
-  applyHash();
-  window.addEventListener("hashchange", applyHash);
-  return () => window.removeEventListener("hashchange", applyHash);
-}, []);
-
-useEffect(() => {
-  const h = "#" + activeTab;
-  if (window.location.hash !== h) window.history.pushState(null, "", h);
-}, [activeTab]);
-  
   // Load
   useEffect(() => {
     try {
