@@ -44,4 +44,10 @@ body.dark{
 
 .card-body{
   gap: 14px !important;
+
+  .tooltip-pop{
+  position: fixed;
+  z-index: 9999;
+  max-width: 260px;
+}
 }
