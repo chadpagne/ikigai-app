@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Plus,
-  Trash,
-  Home,
+  Trash2,
+  Home as HomeIcon,
   Wallet,
   PiggyBank,
   BarChart3,
@@ -11,6 +11,9 @@ import {
   Sun,
   Moon,
   Info,
+  ChevronDown,
+  Shield,
+  Sparkles,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -258,7 +261,31 @@ export default function App() {
   const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem("ikigai_theme") || "light");
+  const [pieMode, setPieMode] = useState("category");
 
+
+useEffect(() => {
+  localStorage.setItem("ikigai_theme", theme);
+  document.body.classList.toggle("dark", theme === "dark");
+}, [theme]);
+
+useEffect(() => {
+  function applyHash() {
+    const h = (window.location.hash || "").replace("#", "");
+    if (h) setActiveTab(h);
+  }
+  applyHash();
+  window.addEventListener("hashchange", applyHash);
+  return () => window.removeEventListener("hashchange", applyHash);
+}, []);
+
+useEffect(() => {
+  const h = "#" + activeTab;
+  if (window.location.hash !== h) window.history.pushState(null, "", h);
+}, [activeTab]);
+  
   // Load
   useEffect(() => {
     try {
