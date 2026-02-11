@@ -1004,14 +1004,32 @@ useEffect(() => {
 
               <div className="note">
                 <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontWeight: 850 }}>Quick Add</div>
-                    <div className="small muted" style={{ marginTop: 4 }}>
-                      Add one item at a time. Everything updates instantly.
-                    </div>
-                  </div>
-                  <Tip text="Examples: Groceries, Gas, Gym, Coffee, Rent, Pet food, Streaming." />
-                </div>
+  <div>
+    <div style={{ fontWeight: 850 }}>Quick Add</div>
+
+    {/* TOGGLE — add this */}
+    <div className="row" style={{ gap: 8, marginTop: 6 }}>
+      <button
+        className={"pill " + (!guidedAdd ? "active" : "")}
+        onClick={() => setGuidedAdd(false)}
+      >
+        Simple
+      </button>
+      <button
+        className={"pill " + (guidedAdd ? "active" : "")}
+        onClick={() => setGuidedAdd(true)}
+      >
+        Guided
+      </button>
+    </div>
+
+    <div className="small muted" style={{ marginTop: 6 }}>
+      Add one item at a time. Everything updates instantly.
+    </div>
+  </div>
+
+  <Tip text="Examples: Groceries, Gas, Gym, Coffee, Rent, Pet food, Streaming." />
+</div>
 
                 <div className="grid-2" style={{ marginTop: 12 }}>
                   <div className="field">
