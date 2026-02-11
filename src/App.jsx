@@ -122,7 +122,7 @@ const DEFAULT_PROFILE = {
 
 function Tip({ text }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 12, left: 12 });
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   const isHoverDesktop = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -131,11 +131,48 @@ function Tip({ text }) {
 
   function openAt(e) {
     const r = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
-    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    const left = Math.min(window.innerWidth - 16, Math.max(16, r.left + r.width / 2));
+    const top = Math.min(window.innerHeight - 16, r.bottom + 10);
     setPos({ left, top });
     setOpen(true);
   }
+
+  useEffect(() => {
+    function close(e) {
+      if (!open) return;
+      if (e.target.closest(".tooltip-wrap")) return;
+      setOpen(false);
+    }
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  return (
+    <span
+      className="tooltip-wrap"
+      onMouseEnter={isHoverDesktop ? openAt : undefined}
+      onMouseLeave={isHoverDesktop ? () => setOpen(false) : undefined}
+      onClick={!isHoverDesktop ? openAt : undefined}
+      style={{ position: "relative", display: "inline-flex" }}
+    >
+      <span className="tip-i">i</span>
+
+      {open && (
+        <div
+          className="tooltip-pop"
+          style={{
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            transform: "translateX(-50%)",
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </span>
+  );
+}
 
   useEffect(() => {
     function onDoc(e) {
