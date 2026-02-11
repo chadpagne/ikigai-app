@@ -1,240 +1,219 @@
 :root{
-  --bg: #f5f7f6;
-  --panel: rgba(255,255,255,0.92);
-  --panelBorder: rgba(15,23,42,0.08);
-  --shadow: 0 10px 30px rgba(15,23,42,0.08);
+  --brand-green:#2f7f6f;
+  --brand-blue:#3a9fbf;
+  --bg1:#f6fbf9;
+  --border:#d7e7e3;
+  --text:#0b0f0e;
+  --muted:#6b7280;
 }
 
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
 body{
-  background:
-    radial-gradient(900px 500px at 20% 0%, rgba(58,159,191,0.14), transparent 60%),
-    radial-gradient(800px 520px at 80% 10%, rgba(47,127,111,0.12), transparent 55%),
-    var(--bg);
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  color: var(--text);
+  background: linear-gradient(to bottom, var(--bg1), white);
 }
 
-body.dark{
-  --bg: #0b1214;
-  --panel: rgba(15,23,42,0.55);
-  --panelBorder: rgba(255,255,255,0.10);
-  --shadow: 0 14px 36px rgba(0,0,0,0.35);
-  background:
-    radial-gradient(900px 500px at 20% 0%, rgba(58,159,191,0.20), transparent 60%),
-    radial-gradient(800px 520px at 80% 10%, rgba(47,127,111,0.18), transparent 55%),
-    var(--bg);
-}
+a{ color:inherit; text-decoration:none; }
 
-/* primary card */
-.card{
-  background: var(--panel);
-  border: 1px solid var(--panelBorder);
-  box-shadow: var(--shadow);
-  border-radius: 22px;
-}
-
-/* inner tiles */
-.tile, .note{
-  border-radius: 18px;
-  border: 1px solid var(--panelBorder);
-}
-
-/* tighten mobile spacing */
 .container{
-  padding: 14px 14px 28px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px;
 }
 
-.card-body{
-  gap: 14px !important;
-}
-/* =========================
-   Ikigai add-ons (append)
-   ========================= */
-
-/* Expand your token set */
-:root{
-  --text: rgba(15,23,42,0.92);
-  --muted: rgba(15,23,42,0.66);
-  --tile: rgba(255,255,255,0.92); /* matches --panel vibe */
-  --focus: rgba(58,159,191,0.55);
+.header{
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.8);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
 }
 
-body.dark{
-  --text: rgba(255,255,255,0.92);
-  --muted: rgba(255,255,255,0.62);
-  --tile: rgba(15,23,42,0.45);
-  --focus: rgba(58,159,191,0.65);
+.header-inner{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-/* Global text */
-body{ color: var(--text); }
-.muted, .sub, .small.muted{ color: var(--muted) !important; }
-
-/* Ensure tiles and notes actually get a background (yours only set border/radius) */
-.tile, .note{
-  background: var(--tile);
-  color: var(--text);
+.brand{
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--brand-green);
+  font-size: 18px;
+  display:flex;
+  align-items:center;
+  gap:10px;
 }
 
-/* Card already has bg from --panel; ensure text inherits */
-.card{ color: var(--text); }
-
-/* Drawer / overlay (if present in your base CSS) */
-.drawer{
-  background: var(--panel);
-  border: 1px solid var(--panelBorder);
-  color: var(--text);
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid rgba(0,0,0,0.10);
+  padding:8px 10px;
+  border-radius: 14px;
+  background:white;
 }
 
-/* Tabs: fix unreadable dark text */
+.nav{
+  display:flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items:center;
+}
+
 .tab{
-  color: rgba(15,23,42,0.75);
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  color: rgba(0,0,0,0.78);
+  background: transparent;
+  cursor:pointer;
 }
-body.dark .tab{
-  color: rgba(255,255,255,0.82) !important;
-}
-body.dark .tab.active{
-  color: rgba(255,255,255,0.95) !important;
-}
-
-/* Buttons in dark mode (keeps your existing .btn styling, just forces text/border consistency) */
-.btn, button{
-  color: inherit;
-}
-.btn.outline{
-  border-color: var(--panelBorder);
-}
-body.dark .btn.outline{
-  border-color: var(--panelBorder);
+.tab:hover{ background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.10); }
+.tab.active{
+  background: rgba(47,127,111,0.10);
+  border-color: rgba(47,127,111,0.35);
+  color: rgba(16, 84, 73, 1);
 }
 
-/* Inputs/selects: prevent “white box with white text” or “dark text on dark bg” */
-.input, input, select, textarea{
-  color: var(--text);
-  border-color: var(--panelBorder);
-}
-body.dark .input,
-body.dark input,
-body.dark select,
-body.dark textarea{
-  background: rgba(0,0,0,0.22);
-  color: var(--text);
-  border-color: var(--panelBorder);
-}
-body.dark input::placeholder,
-body.dark textarea::placeholder{
-  color: rgba(255,255,255,0.45);
+.card{
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.75);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
 }
 
-/* Focus rings */
-.input:focus, input:focus, select:focus, textarea:focus,
-.btn:focus, button:focus{
-  outline: none;
-  box-shadow: 0 0 0 3px var(--focus);
+.card-body{ padding: 18px; }
+
+.h1{ font-size: 24px; margin: 0; }
+.sub{ margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+
+.grid-2{ display:grid; grid-template-columns: 1fr; gap: 16px; }
+.grid-3{ display:grid; grid-template-columns: 1fr; gap: 16px; }
+.grid-4{ display:grid; grid-template-columns: 1fr; gap: 16px; }
+
+@media (min-width: 860px){
+  .grid-2{ grid-template-columns: 1fr 1fr; }
+  .grid-3{ grid-template-columns: repeat(3, 1fr); }
+  .grid-4{ grid-template-columns: repeat(4, 1fr); }
 }
 
-/* Tooltip readability + keep it above everything */
-.tooltip-pop{
-  max-width: 280px;
-  width: max-content;
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: white;
+  color: rgba(0,0,0,0.80);
   padding: 10px 12px;
+  border-radius: 14px;
+  cursor:pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+.btn:hover{ background: rgba(0,0,0,0.03); }
+.btn.primary{
+  background: var(--brand-green);
+  color: white;
+  border-color: rgba(0,0,0,0);
+}
+.btn.primary:hover{ filter: brightness(0.96); }
+.btn.ghost{
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover{ background: rgba(0,0,0,0.04); }
+
+.field{
+  display:flex;
+  flex-direction: column;
+  gap:6px;
+}
+.label{
+  font-size: 12px;
+  color: rgba(0,0,0,0.60);
+  font-weight: 600;
+}
+.input, select, input[type="range"]{
+  border: 1px solid rgba(0,0,0,0.14);
+  background: white;
   border-radius: 12px;
-  background: rgba(15,23,42,0.95);
-  color: rgba(255,255,255,0.95);
-  box-shadow: 0 16px 40px rgba(0,0,0,0.25);
-  z-index: 9999;
+  padding: 10px 12px;
+  font-size: 14px;
 }
-body.dark .tooltip-pop{
-  background: rgba(0,0,0,0.92);
+.row{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-
-/* Range slider end alignment (WebKit + Firefox) */
-.range{
-  height: 28px;
-  padding: 0;
-}
-.range::-webkit-slider-runnable-track{
-  height: 6px;
+.right{ margin-left:auto; }
+.muted{ color: var(--muted); }
+.small{ font-size: 12px; }
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(148,163,184,0.45);
+  border: 1px solid rgba(0,0,0,0.12);
+  background:white;
+  font-size: 12px;
+  cursor:pointer;
 }
-body.dark .range::-webkit-slider-runnable-track{
-  background: rgba(148,163,184,0.30);
+.pill.active{
+  background: rgba(47,127,111,0.10);
+  border-color: rgba(47,127,111,0.35);
+  color: rgba(16, 84, 73, 1);
 }
-.range::-webkit-slider-thumb{
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
+
+.note{
+  border: 1px solid rgba(0,0,0,0.08);
+  background: white;
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.kicker{ font-size: 12px; color: var(--muted); }
+
+.badge{
+  font-size: 11px;
+  padding: 6px 10px;
   border-radius: 999px;
-  margin-top: -6px; /* centers on 6px track */
-  background: rgba(58,159,191,0.95);
-  border: 2px solid rgba(255,255,255,0.55);
+  border: 1px solid rgba(0,0,0,0.12);
+  background:white;
 }
-.range::-moz-range-track{
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(148,163,184,0.45);
+.badge.good{ border-color: rgba(16,185,129,0.25); background: rgba(16,185,129,0.10); color: rgba(6,95,70,1); }
+.badge.warn{ border-color: rgba(245,158,11,0.25); background: rgba(245,158,11,0.10); color: rgba(146,64,14,1); }
+
+.tile{
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.75);
+  padding: 14px;
 }
-body.dark .range::-moz-range-track{
-  background: rgba(148,163,184,0.30);
+.big-number{ font-size: 24px; font-weight: 800; margin-top: 10px; display:flex; align-items: baseline; gap: 8px; cursor:pointer; }
+.big-number small{ font-size: 12px; color: var(--muted); font-weight: 700; }
+
+.divider{ height: 1px; background: rgba(0,0,0,0.06); margin: 12px 0; }
+
+.progress-tile{
+  position: relative;
+  overflow:hidden;
 }
-.range::-moz-range-thumb{
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: rgba(58,159,191,0.95);
-  border: 2px solid rgba(255,255,255,0.55);
-}
-/* -----------------------------
-   MOBILE FIRST FIXES
------------------------------ */
-@media (max-width: 768px) {
-
-  /* Force all grids to single column */
-  .grid-2,
-  .grid-3,
-  .grid-4 {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Reduce tile padding */
-  .tile,
-  .note {
-    padding: 14px !important;
-  }
-
-  /* Reduce card padding */
-  .card-body {
-    padding: 14px !important;
-  }
-
-  /* Charts should not overflow */
-  .recharts-wrapper {
-    max-width: 100% !important;
-    overflow: hidden;
-  }
-
-  /* Bucket tiles: make them wider & shorter */
-  .progress-tile {
-    min-height: 140px;
-  }
-
-  /* Prevent giant headers */
-  h1, .h1 {
-    font-size: 22px;
-  }
-
-  .sub {
-    font-size: 14px;
-  }
-
-  /* Navigation spacing */
-  .nav {
-    gap: 6px;
-    overflow-x: auto;
-  }
-
-  .tab {
-    font-size: 13px;
-    padding: 8px 10px;
-  }
+.progress-fill{
+  position:absolute; inset:0;
+  transform-origin: bottom;
 }
