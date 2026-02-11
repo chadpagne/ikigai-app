@@ -191,7 +191,7 @@ function Tip({ text }) {
 
   return (
     <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
-      <button
+<button
   type="button"
   className="tip-i"
   aria-label="Info"
