@@ -1007,15 +1007,17 @@ useEffect(() => {
   <div>
     <div style={{ fontWeight: 850 }}>Quick Add</div>
 
-    {/* TOGGLE — add this */}
+    {/* Toggle */}
     <div className="row" style={{ gap: 8, marginTop: 6 }}>
       <button
+        type="button"
         className={"pill " + (!guidedAdd ? "active" : "")}
         onClick={() => setGuidedAdd(false)}
       >
         Simple
       </button>
       <button
+        type="button"
         className={"pill " + (guidedAdd ? "active" : "")}
         onClick={() => setGuidedAdd(true)}
       >
