@@ -208,55 +208,67 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status,
   const cur = clamp01(currentPct);
   const proj = clamp01(projectedPct);
 
-// Current fill: darker blue
-const CURRENT = "rgba(58,159,191,0.55)";
+  // Current fill: darker blue
+  const CURRENT = "rgba(58,159,191,0.55)";
 
-// Projected overlay: lighter + striped so it’s obvious
-const PROJECTED = `repeating-linear-gradient(
-  135deg,
-  rgba(58,159,191,0.18) 0px,
-  rgba(58,159,191,0.18) 8px,
-  rgba(58,159,191,0.06) 8px,
-  rgba(58,159,191,0.06) 16px
-)`;
+  // Projected overlay: lighter + striped so it’s obvious
+  const PROJECTED = `repeating-linear-gradient(
+    135deg,
+    rgba(58,159,191,0.18) 0px,
+    rgba(58,159,191,0.18) 8px,
+    rgba(58,159,191,0.06) 8px,
+    rgba(58,159,191,0.06) 16px
+  )`;
 
   return (
-    <div className="tile progress-tile" onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}>
- {/* projected fill (behind) */}
-<div
-  className="progress-fill"
-  style={{
-    background: TINT,
-    height: `${proj * 100}%`,
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.55,     // tweak as desired
-    zIndex: 1,
-  }}
-/>
+    <div
+      className="tile progress-tile"
+      onClick={onClick}
+      style={{
+        cursor: onClick ? "pointer" : "default",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* projected fill (behind) */}
+      <div
+        className="progress-fill"
+        style={{
+          background: PROJECTED,
+          height: `${proj * 100}%`,
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1,
+        }}
+      />
 
-{/* current fill (on top) */}
-<div
-  className="progress-fill"
-  style={{
-    background: SOLID,
-    height: `${cur * 100}%`,
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 2,
-  }}
-/>
-      
-      <div style={{ position: "relative" }}>
+      {/* current fill (on top) */}
+      <div
+        className="progress-fill"
+        style={{
+          background: CURRENT,
+          height: `${cur * 100}%`,
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 2,
+        }}
+      />
+
+      <div style={{ position: "relative", zIndex: 3 }}>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 750 }}>{title}</div>
-            {subtitle ? <div className="small muted" style={{ marginTop: 4 }}>{subtitle}</div> : null}
+            {subtitle ? (
+              <div className="small muted" style={{ marginTop: 4 }}>
+                {subtitle}
+              </div>
+            ) : null}
           </div>
+
           <div className="row" style={{ gap: 8, alignItems: "center" }}>
             {status ? (
               <span className={"badge " + (status === "on_track" ? "good" : "warn")}>
@@ -267,9 +279,12 @@ const PROJECTED = `repeating-linear-gradient(
           </div>
         </div>
 
-        <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+        <div
+          className="row"
+          style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}
+        >
           <div className="small muted">{footer ?? ""}</div>
-          <Tip text="Solid = what you have now. Tint = what your current $/mo can reach by your end date (or next 12 months)." />
+          <Tip text="Solid = what you have now. Stripes = what your current $/mo can reach by your end date (or next 12 months)." />
         </div>
       </div>
     </div>
