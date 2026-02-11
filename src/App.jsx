@@ -195,8 +195,10 @@ function Tip({ text }) {
   type="button"
   className="tip-i"
   aria-label="Info"
-  onClick={() => {
-    if (!isHoverDesktop) (open ? setOpen(false) : openAt);
+  onClick={(e) => {
+    if (!isHoverDesktop) {
+      open ? setOpen(false) : openAt(e);
+    }
   }}
   onMouseEnter={(e) => {
     if (isHoverDesktop) openAt(e);
@@ -206,7 +208,7 @@ function Tip({ text }) {
   }}
 >
   i
-      </button>
+</button>
 
       {open ? (
         <span
