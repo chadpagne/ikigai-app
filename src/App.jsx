@@ -220,7 +220,6 @@ function Tip({ text }) {
       ) : null}
     </span>
   );
-}
 
     const below = r.bottom + 10;
     const above = r.top - 10;
