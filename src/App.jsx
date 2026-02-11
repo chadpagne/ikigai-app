@@ -1263,36 +1263,20 @@ export default function App() {
                     return (
                       <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         <BucketTile
-                          title={g.name}
-                          subtitle={`Category: ${g.category}`}
-                          currentPct={gp?.pct ?? 0}
-                          projectedPct={gp?.projectedPct ?? 0}
-                          status={gp?.status ?? null}
-                          footer={monthsLeft !== null ? `${monthsLeft} months left` : etaText()}
-                        />
+  title={g.name}
+  subtitle={`Category: ${g.category}`}
+  currentPct={gp?.pct ?? 0}
+  projectedPct={gp?.projectedPct ?? 0}
+  status={gp?.status ?? null}
+  footer={monthsLeft !== null ? `${monthsLeft} months left` : etaText()}
+  onClick={() => setExpandedGoalId((id) => (id === g.id ? null : g.id))}
+/>
 
-                        <div className="note">
-                          <div className="grid-2">
-                            <div className="field">
-                              <div className="label">Target</div>
-                              <input className="input" inputMode="numeric" value={g.target} onChange={(e) => updateGoal(g.id, { target: safeNum(e.target.value) })} />
-                            </div>
-                            <div className="field">
-                              <div className="label">Current</div>
-                              <input className="input" inputMode="numeric" value={g.current} onChange={(e) => updateGoal(g.id, { current: safeNum(e.target.value) })} />
-                            </div>
-                          </div>
-
-                          <div className="grid-2" style={{ marginTop: 10 }}>
-                            <div className="field">
-                              <div className="label">$ / month</div>
-                              <input className="input" inputMode="numeric" value={g.monthly} onChange={(e) => updateGoal(g.id, { monthly: safeNum(e.target.value) })} />
-                            </div>
-                            <div className="field">
-                              <div className="label">End date</div>
-                              <input className="input" type="date" value={g.endDate} onChange={(e) => updateGoal(g.id, { endDate: e.target.value })} />
-                            </div>
-                          </div>
+{expandedGoalId === g.id ? (
+  <div className="note">
+    ...inputs...
+  </div>
+) : null}
 
                           <div className="row" style={{ marginTop: 10, justifyContent: "flex-end" }}>
                             <button className="btn" onClick={() => removeGoal(g.id)} title="Remove">
