@@ -222,8 +222,7 @@ const PROJECTED = `repeating-linear-gradient(
 
   return (
     <div className="tile progress-tile" onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}>
- {/* current fill */}
-{/* projected fill (behind) */}
+ {/* projected fill (behind) */}
 <div
   className="progress-fill"
   style={{
