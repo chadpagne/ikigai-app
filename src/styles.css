@@ -262,8 +262,48 @@ body.dark .header{
 
   padding: 10px 12px;
   border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
   border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+
+  /* polish */
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+  pointer-events: none;
+  animation: tipIn 140ms ease-out forwards;
+}
+
+@keyframes tipIn{
+  to{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0px);
+  }
+}
+
+/* make the "i" look intentional */
+.tip-i{
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+  user-select: none;
+
+  background: rgba(58,159,191,0.18);
+  color: rgba(58,159,191,0.95);
+  border: 1px solid rgba(58,159,191,0.25);
+}
+
+body.dark .tip-i{
+  background: rgba(58,159,191,0.16);
+  color: rgba(58,159,191,0.95);
+  border-color: rgba(58,159,191,0.28);
 }
 
 .tip-i{
