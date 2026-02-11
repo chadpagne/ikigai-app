@@ -131,11 +131,8 @@ function Tip({ text }) {
 
   function openAt(e) {
     const r = e.currentTarget.getBoundingClientRect();
-
-    // Center on icon, clamp within viewport
     const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
     const top = Math.min(window.innerHeight - 12, r.bottom + 10);
-
     setPos({ left, top });
     setOpen(true);
   }
@@ -162,17 +159,14 @@ function Tip({ text }) {
         className="tip-i"
         aria-label="Info"
         onClick={(e) => {
-          // mobile/touch: tap toggles
           if (!isHoverDesktop) {
             open ? setOpen(false) : openAt(e);
           }
         }}
         onMouseEnter={(e) => {
-          // desktop: hover opens
           if (isHoverDesktop) openAt(e);
         }}
         onMouseLeave={() => {
-          // desktop: leaving closes
           if (isHoverDesktop) setOpen(false);
         }}
       >
@@ -187,55 +181,6 @@ function Tip({ text }) {
           {text}
         </span>
       )}
-    </span>
-  );
-}
-
-    const below = r.bottom + 10;
-    const above = r.top - 10;
-
-    const top =
-      below + TIP_H > window.innerHeight - TIP_PAD
-        ? Math.max(TIP_PAD, above - TIP_H)
-        : Math.min(window.innerHeight - TIP_PAD, below);
-
-    setPos({ left, top });
-    setOpen(true);
-  }
-
-  useEffect(() => {
-    function onDoc(e) {
-      if (!open) return;
-      const t = e.target;
-      if (t && t.closest && t.closest(".tooltip-wrap")) return;
-      setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("touchstart", onDoc, { passive: true });
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("touchstart", onDoc);
-    };
-  }, [open]);
-
-  return (
-    <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
-      <button
-        type="button"
-        className="chip"
-        aria-label="Info"
-        onClick={open ? () => setOpen(false) : openAt}
-      >
-        <Info size={16} />
-      </button>
-      {open ? (
-        <span
-          className="tooltip-pop"
-          style={{ top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
-        >
-          {text}
-        </span>
-      ) : null}
     </span>
   );
 }
