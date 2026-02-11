@@ -209,7 +209,7 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status,
   const proj = clamp01(projectedPct);
 
   // Current fill: darker blue
-  opacity: 1,
+ const CURRENT = "rgba(58,159,191,1)"; // full opacity
 
   // Projected overlay: lighter + striped so it’s obvious
   const PROJECTED = `repeating-linear-gradient(
