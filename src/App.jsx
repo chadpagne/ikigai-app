@@ -206,7 +206,7 @@ function NeedWantBadge({ value }) {
 
 function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status, onClick }) {
   const cur = clamp01(currentPct);
-const proj = clamp01(projectedPct);
+  const proj = clamp01(projectedPct);
 
 // Current fill: darker blue
 const CURRENT = "rgba(58,159,191,0.55)";
@@ -222,7 +222,7 @@ const PROJECTED = `repeating-linear-gradient(
 
   return (
     <div className="tile progress-tile" onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}>
-  {/* current fill */}
+ {/* current fill */}
 <div
   className="progress-fill"
   style={{
