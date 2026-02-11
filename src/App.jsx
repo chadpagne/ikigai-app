@@ -213,7 +213,7 @@ function Tip({ text }) {
       {open ? (
         <span
           className="tooltip-pop"
-          style={{ top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
+          style={{ top: pos.top, left: pos.left }}
         >
           {text}
         </span>
