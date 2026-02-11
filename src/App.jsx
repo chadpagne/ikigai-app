@@ -209,7 +209,7 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status,
   const proj = clamp01(projectedPct);
 
   // Current fill: darker blue
-  const CURRENT = "rgba(58,159,191,0.55)";
+  opacity: 1,
 
   // Projected overlay: lighter + striped so it’s obvious
   const PROJECTED = `repeating-linear-gradient(
@@ -246,17 +246,18 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status,
 
       {/* current fill (on top) */}
       <div
-        className="progress-fill"
-        style={{
-          background: CURRENT,
-          height: `${cur * 100}%`,
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 2,
-        }}
-      />
+  className="progress-fill"
+  style={{
+    background: CURRENT,
+    height: `${cur * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    opacity: 1,
+  }}
+/>
 
       <div style={{ position: "relative", zIndex: 3 }}>
         <div className="row" style={{ alignItems: "flex-start" }}>
