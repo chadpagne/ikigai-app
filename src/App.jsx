@@ -192,14 +192,20 @@ function Tip({ text }) {
   return (
     <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
       <button
-        type="button"
-        className="chip"
-        aria-label="Info"
-        onClick={!isHoverDesktop ? (open ? () => setOpen(false) : openAt) : undefined}
-        onMouseEnter={isHoverDesktop ? openAt : undefined}
-        onMouseLeave={isHoverDesktop ? () => setOpen(false) : undefined}
-      >
-        <Info size={16} />
+  type="button"
+  className="tip-i"
+  aria-label="Info"
+  onClick={() => {
+    if (!isHoverDesktop) (open ? setOpen(false) : openAt);
+  }}
+  onMouseEnter={(e) => {
+    if (isHoverDesktop) openAt(e);
+  }}
+  onMouseLeave={() => {
+    if (isHoverDesktop) setOpen(false);
+  }}
+>
+  i
       </button>
 
       {open ? (
