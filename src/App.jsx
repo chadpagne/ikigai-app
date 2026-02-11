@@ -122,53 +122,64 @@ const DEFAULT_PROFILE = {
 
 function Tip({ text }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [pos, setPos] = useState({ top: 12, left: 12 });
 
   const isHoverDesktop = useMemo(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   }, []);
 
- function openAt(e) {
-  const r = e.currentTarget.getBoundingClientRect();
-  const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
-  const top  = Math.min(window.innerHeight - 12, r.bottom + 10);
-  setPos({ left, top });
-  setOpen(true);
-}
+  function openAt(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
+    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    setPos({ left, top });
+    setOpen(true);
+  }
 
   useEffect(() => {
-    function close(e) {
+    function onDoc(e) {
       if (!open) return;
-      if (e.target.closest(".tooltip-wrap")) return;
+      const t = e.target;
+      if (t && t.closest && t.closest(".tooltip-wrap")) return;
       setOpen(false);
     }
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
   }, [open]);
 
   return (
-    <span
-      className="tooltip-wrap"
-      onMouseEnter={isHoverDesktop ? openAt : undefined}
-      onMouseLeave={isHoverDesktop ? () => setOpen(false) : undefined}
-      onClick={!isHoverDesktop ? openAt : undefined}
-      style={{ position: "relative", display: "inline-flex" }}
-    >
-      <span className="tip-i">i</span>
+    <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
+      <button
+        type="button"
+        className="tip-i"
+        aria-label="Info"
+        onClick={(e) => {
+          if (!isHoverDesktop) {
+            open ? setOpen(false) : openAt(e);
+          }
+        }}
+        onMouseEnter={(e) => {
+          if (isHoverDesktop) openAt(e);
+        }}
+        onMouseLeave={() => {
+          if (isHoverDesktop) setOpen(false);
+        }}
+      >
+        i
+      </button>
 
       {open && (
-        <div
+        <span
           className="tooltip-pop"
-          style={{
-            position: "fixed",
-            top: pos.top,
-            left: pos.left,
-            transform: "translateX(-50%)",
-          }}
+          style={{ top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
         >
           {text}
-        </div>
+        </span>
       )}
     </span>
   );
