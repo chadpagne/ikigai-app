@@ -331,20 +331,33 @@ export default function App() {
     document.body.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  // Hash routing (so browser back stays inside app)
-  useEffect(() => {
-    function applyHash() {
-      const h = (window.location.hash || "").replace("#", "");
-      if (h) setActiveTab(h);
+// Hash routing (safe)
+const VALID_TABS = useMemo(
+  () => new Set(["home", "ikigai", "goals", "networth", "retirement", "about"]),
+  []
+);
+
+useEffect(() => {
+  function applyHash() {
+    const h = (window.location.hash || "").replace("#", "");
+    if (VALID_TABS.has(h)) {
+      setActiveTab(h);
+    } else if (h) {
+      // unknown hash -> force home
+      setActiveTab("home");
+      window.history.replaceState(null, "", "#home");
     }
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
-  }, []);
-  useEffect(() => {
-    const h = "#" + activeTab;
-    if (window.location.hash !== h) window.history.pushState(null, "", h);
-  }, [activeTab]);
+  }
+
+  applyHash();
+  window.addEventListener("hashchange", applyHash);
+  return () => window.removeEventListener("hashchange", applyHash);
+}, [VALID_TABS]);
+
+useEffect(() => {
+  const h = "#" + activeTab;
+  if (window.location.hash !== h) window.history.pushState(null, "", h);
+}, [activeTab]);
 
   // Load saved state
   useEffect(() => {
@@ -612,7 +625,15 @@ export default function App() {
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
           </div>
-
+{!["home","ikigai","goals","networth","retirement","about"].includes(activeTab) ? (
+  <div className="card">
+    <div className="card-body">
+      <h2 className="h1">Lost in navigation</h2>
+      <p className="sub">Resetting you back to Home.</p>
+      <button className="btn primary" onClick={() => setActiveTab("home")}>Go to Home</button>
+    </div>
+  </div>
+) : null}
           <div className="nav" role="navigation" aria-label="Primary">
             <TabButton id="home" label="Home" Icon={HomeIcon} />
             <TabButton id="ikigai" label="Build Your Ikigai" Icon={Wallet} />
