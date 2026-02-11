@@ -124,19 +124,58 @@ function Tip({ text }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 12, left: 12 });
 
-  // Clamp to viewport so it doesn't fly off-screen on mobile Chrome.
-  const TIP_PAD = 12;
-  const TIP_W = 280;   // matches CSS max-width patch
-  const TIP_H = 120;   // rough height estimate; top logic keeps it visible
+  const isHoverDesktop = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  }, []);
 
   function openAt(e) {
     const r = e.currentTarget.getBoundingClientRect();
-    const centerX = r.left + r.width / 2;
+    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
+    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    setPos({ left, top });
+    setOpen(true);
+  }
 
-    const left = Math.min(
-      window.innerWidth - TIP_PAD - TIP_W / 2,
-      Math.max(TIP_PAD + TIP_W / 2, centerX)
-    );
+  useEffect(() => {
+    function onDoc(e) {
+      if (!open) return;
+      const t = e.target;
+      if (t && t.closest && t.closest(".tooltip-wrap")) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
+  }, [open]);
+
+  return (
+    <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
+      <button
+        type="button"
+        className="chip"
+        aria-label="Info"
+        onClick={!isHoverDesktop ? (open ? () => setOpen(false) : openAt) : undefined}
+        onMouseEnter={isHoverDesktop ? openAt : undefined}
+        onMouseLeave={isHoverDesktop ? () => setOpen(false) : undefined}
+      >
+        <Info size={16} />
+      </button>
+
+      {open ? (
+        <span
+          className="tooltip-pop"
+          style={{ top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
+        >
+          {text}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
     const below = r.bottom + 10;
     const above = r.top - 10;
