@@ -185,45 +185,6 @@ body.dark .range::-moz-range-track{
   border: 2px solid rgba(255,255,255,0.55);
 }
 
-  /* Reduce tile padding */
-  .tile,
-  .note {
-    padding: 14px !important;
-  }
-
-  }
-
-  /* Charts should not overflow */
-  .recharts-wrapper {
-    max-width: 100% !important;
-    overflow: hidden;
-  }
-
-  /* Bucket tiles: make them wider & shorter */
-  .progress-tile {
-    min-height: 140px;
-  }
-
-  /* Prevent giant headers */
-  h1, .h1 {
-    font-size: 22px;
-  }
-
-  .sub {
-    font-size: 14px;
-  }
-
-  /* Navigation spacing */
-  .nav {
-    gap: 6px;
-    overflow-x: auto;
-  }
-
-  .tab {
-    font-size: 13px;
-    padding: 8px 10px;
-  }
-}
 /* Mobile: collapse multi-column grids only (do NOT touch padding/typography) */
 @media (max-width: 768px) {
   .grid-2, .grid-3, .grid-4 {
