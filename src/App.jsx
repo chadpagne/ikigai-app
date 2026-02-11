@@ -223,29 +223,32 @@ const PROJECTED = `repeating-linear-gradient(
   return (
     <div className="tile progress-tile" onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}>
  {/* current fill */}
+{/* projected fill (behind) */}
 <div
   className="progress-fill"
   style={{
-    background: CURRENT,
-    height: `${cur * 100}%`,
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-  }}
-/>
-
-{/* projected overlay */}
-<div
-  className="progress-fill"
-  style={{
-    background: PROJECTED,
+    background: TINT,
     height: `${proj * 100}%`,
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    borderTop: "1px solid rgba(58,159,191,0.45)",
+    opacity: 0.55,     // tweak as desired
+    zIndex: 1,
+  }}
+/>
+
+{/* current fill (on top) */}
+<div
+  className="progress-fill"
+  style={{
+    background: SOLID,
+    height: `${cur * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
   }}
 />
       
