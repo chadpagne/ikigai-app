@@ -321,3 +321,10 @@ body.dark .range::-webkit-slider-thumb{
 .progress-fill{
   pointer-events:none;
 }
+
+/* Dark mode: fix select option contrast */
+body.dark select,
+body.dark option {
+  background-color: rgba(15,23,42,0.90);
+  color: rgba(255,255,255,0.92);
+}
