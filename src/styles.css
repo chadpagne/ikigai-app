@@ -251,16 +251,39 @@ body.dark .header{
   color:var(--text);
   cursor:pointer;
 }
+
 .tooltip-pop{
-  position:fixed;
-  max-width:min(320px, calc(100vw - 24px));
-  z-index:9999;
-  background:var(--card);
-  border:1px solid var(--border);
-  color:var(--text);
-  padding:10px 12px;
-  border-radius:12px;
-  box-shadow:0 12px 40px rgba(0,0,0,0.25);
+  position: fixed;
+  max-width: min(320px, calc(100vw - 24px));
+  z-index: 9999;
+
+  background: rgba(15,23,42,0.95);
+  color: rgba(255,255,255,0.95);
+
+  padding: 10px 12px;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.tip-i{
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+
+  cursor: pointer;
+  user-select: none;
+
+  background: rgba(58,159,191,0.18);
+  color: rgba(58,159,191,0.95);
+  border: 1px solid rgba(58,159,191,0.25);
 }
 
 /* Drawer */
