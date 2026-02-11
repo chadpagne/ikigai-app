@@ -204,41 +204,51 @@ function NeedWantBadge({ value }) {
   );
 }
 
-function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status }) {
+function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status, onClick }) {
   const cur = clamp01(currentPct);
-  const proj = clamp01(projectedPct);
+const proj = clamp01(projectedPct);
 
-  // Blue + a clearly different overlay
-  const SOLID = "rgba(58,159,191,0.28)"; // blue
-  const TINT = "rgba(58,159,191,0.72)";  // stronger blue overlay
+// Current fill: darker blue
+const CURRENT = "rgba(58,159,191,0.55)";
+
+// Projected overlay: lighter + striped so it’s obvious
+const PROJECTED = `repeating-linear-gradient(
+  135deg,
+  rgba(58,159,191,0.18) 0px,
+  rgba(58,159,191,0.18) 8px,
+  rgba(58,159,191,0.06) 8px,
+  rgba(58,159,191,0.06) 16px
+)`;
 
   return (
-    <div className="tile progress-tile">
-      {/* current fill */}
-      <div
-        className="progress-fill"
-        style={{
-          background: SOLID,
-          height: `${cur * 100}%`,
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-        }}
-      />
-      {/* projected overlay */}
-      <div
-        className="progress-fill"
-        style={{
-          background: TINT,
-          height: `${proj * 100}%`,
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          mixBlendMode: "multiply",
-        }}
-      />
+    <div className="tile progress-tile" onClick={onClick} style={{ cursor: onClick ? "pointer" : "default" }}>
+  {/* current fill */}
+<div
+  className="progress-fill"
+  style={{
+    background: CURRENT,
+    height: `${cur * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+  }}
+/>
+
+{/* projected overlay */}
+<div
+  className="progress-fill"
+  style={{
+    background: PROJECTED,
+    height: `${proj * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTop: "1px solid rgba(58,159,191,0.45)",
+  }}
+/>
+      
       <div style={{ position: "relative" }}>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <div style={{ flex: 1 }}>
