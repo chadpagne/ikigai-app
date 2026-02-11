@@ -318,6 +318,7 @@ export default function App() {
 
   const [pieMode, setPieMode] = useState("category"); // category | needwant
   const [categoryFilter, setCategoryFilter] = useState(null);
+  const [expandedGoalId, setExpandedGoalId] = useState(null);
 
   // Theme apply
   useEffect(() => {
