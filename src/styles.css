@@ -184,6 +184,17 @@ body.dark .range::-moz-range-track{
   background: rgba(58,159,191,0.95);
   border: 2px solid rgba(255,255,255,0.55);
 }
+/* -----------------------------
+   MOBILE FIRST FIXES
+----------------------------- */
+@media (max-width: 768px) {
+
+  /* Force all grids to single column */
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
 
   /* Reduce tile padding */
   .tile,
@@ -191,6 +202,9 @@ body.dark .range::-moz-range-track{
     padding: 14px !important;
   }
 
+  /* Reduce card padding */
+  .card-body {
+    padding: 14px !important;
   }
 
   /* Charts should not overflow */
@@ -222,11 +236,5 @@ body.dark .range::-moz-range-track{
   .tab {
     font-size: 13px;
     padding: 8px 10px;
-  }
-}
-/* Mobile: collapse multi-column grids only (do NOT touch padding/typography) */
-@media (max-width: 768px) {
-  .grid-2, .grid-3, .grid-4 {
-    grid-template-columns: 1fr !important;
   }
 }
