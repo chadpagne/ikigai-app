@@ -328,3 +328,9 @@ body.dark option {
   background-color: rgba(15,23,42,0.90);
   color: rgba(255,255,255,0.92);
 }
+
+@media (hover: hover) and (pointer: fine) {
+  .tooltip-wrap .chip:hover + .tooltip-pop {
+    display: inline-block;
+  }
+}
