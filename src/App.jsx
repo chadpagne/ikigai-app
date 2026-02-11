@@ -129,13 +129,13 @@ function Tip({ text }) {
     return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   }, []);
 
-  function openAt(e) {
-    const r = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(window.innerWidth - 16, Math.max(16, r.left + r.width / 2));
-    const top = Math.min(window.innerHeight - 16, r.bottom + 10);
-    setPos({ left, top });
-    setOpen(true);
-  }
+ function openAt(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
+  const top  = Math.min(window.innerHeight - 12, r.bottom + 10);
+  setPos({ left, top });
+  setOpen(true);
+}
 
   useEffect(() => {
     function close(e) {
