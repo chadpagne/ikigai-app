@@ -1003,24 +1003,15 @@ useEffect(() => {
               </div>
 
               <div className="note">
-                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
-  <div>
+                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+  <div style={{ flex: 1, minWidth: 260 }}>
     <div style={{ fontWeight: 850 }}>Quick Add</div>
 
-    {/* Toggle */}
-    <div className="row" style={{ gap: 8, marginTop: 6 }}>
-      <button
-        type="button"
-        className={"pill " + (!guidedAdd ? "active" : "")}
-        onClick={() => setGuidedAdd(false)}
-      >
+    <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+      <button type="button" className={"pill " + (!guidedAdd ? "active" : "")} onClick={() => setGuidedAdd(false)}>
         Simple
       </button>
-      <button
-        type="button"
-        className={"pill " + (guidedAdd ? "active" : "")}
-        onClick={() => setGuidedAdd(true)}
-      >
+      <button type="button" className={"pill " + (guidedAdd ? "active" : "")} onClick={() => setGuidedAdd(true)}>
         Guided
       </button>
     </div>
