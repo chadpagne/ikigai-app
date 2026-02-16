@@ -205,19 +205,26 @@ body.dark .header{
 .btn.outline{
   background:transparent;
 }
+
 .pill{
-  padding:8px 10px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  background:transparent;
-  cursor:pointer;
-  font-weight:800;
-  color:var(--text);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panelBorder);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 650;
+  line-height: 1;
 }
+
 .pill.active{
-  background:rgba(58,159,191,0.14);
-  border-color:rgba(58,159,191,0.35);
+  background: rgba(58,159,191,0.18);
+  border-color: rgba(58,159,191,0.40);
 }
+
 
 .badge{
   display:inline-flex;
