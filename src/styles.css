@@ -26,8 +26,14 @@ body.dark{
 }
 
 *{ box-sizing:border-box; }
-html,body{ height:100%; }
+html,body{
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale; height:100%; }
 body{
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
   background:var(--bg);
@@ -100,7 +106,10 @@ body.dark .header{
   box-shadow:var(--shadow);
 }
 
-.card-body{ padding:18px; }
+.card-body{
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale; padding:18px; }
 
 .h1{ margin:0; font-size:22px; font-weight:900; }
 .sub{ margin:6px 0 0; color:var(--muted); }
@@ -168,7 +177,7 @@ body.dark .header{
 }
 
 .field{ display:flex; flex-direction:column; gap:6px; }
-.input, select{
+input, textarea, select, .input{
   width:100%;
   padding: 10px 12px;
   border-radius:12px;
@@ -278,13 +287,14 @@ body.dark .header{
   opacity: 0;
   pointer-events: none;
   animation: tipIn 140ms ease-out forwards;
+  max-height: 180px;
+  overflow: auto;
 }
 
 @keyframes tipIn{
   to{
     opacity: 1;
   }
-}
 }
 
 /* make the "i" look intentional */

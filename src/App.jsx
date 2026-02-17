@@ -135,15 +135,27 @@ function Tip({ text }) {
   function openAt(e) {
     const r = e.currentTarget.getBoundingClientRect();
     const TIP_PAD = 12;
-    const TIP_MAX_W = 280; // keep in sync with CSS max-width
+    const TIP_MAX_W = 240;
+    const maxWidth = Math.min(TIP_MAX_W, window.innerWidth - TIP_PAD * 2);
+
+    const half = maxWidth / 2;
     const centerX = r.left + r.width / 2;
-    const minLeft = TIP_PAD + TIP_MAX_W / 2;
-    const maxLeft = window.innerWidth - TIP_PAD - TIP_MAX_W / 2;
-    const left = Math.min(maxLeft, Math.max(minLeft, centerX));
-    const top = Math.min(window.innerHeight - TIP_PAD, r.bottom + 10);
-    setPos({ left, top });
+    const left = Math.min(window.innerWidth - TIP_PAD - half, Math.max(TIP_PAD + half, centerX));
+
+    // try below; if it would go off-screen, flip above
+    const below = r.bottom + 10;
+    const above = r.top - 10;
+    const TIP_H = 84;
+
+    const top =
+      below + TIP_H > window.innerHeight - TIP_PAD
+        ? Math.max(TIP_PAD, above - TIP_H)
+        : Math.min(window.innerHeight - TIP_PAD, below);
+
+    setPos({ left, top, maxWidth });
     setOpen(true);
   }
+
 
   useEffect(() => {
     function onDoc(e) {
@@ -916,7 +928,11 @@ useEffect(() => {
                       <h2 className="h1">Home</h2>
                       <p className="sub">A calm snapshot of your life right now.</p>
                     </div>
-                    <button className="btn" onClick={() => { setOnboardingDone(false); setOnboardingStep(1); }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => { setOnboardingDone(false); setOnboardingStep(1); }}
+                    >
                       Edit basics
                     </button>
                   </div>
@@ -925,7 +941,7 @@ useEffect(() => {
                     <div className="tile">
                       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Spending</div>
-                        <Tip text="This reflects your current life — not a rule you must follow forever." />
+                        <Tip text="Tap the number to switch Monthly ↔ Annual." />
                       </div>
                       <div
                         className="big-number"
@@ -942,7 +958,7 @@ useEffect(() => {
                     <div className="tile">
                       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Savings rate</div>
-                        <Tip text="This naturally changes as priorities and seasons shift." />
+                        <Tip text="Savings rate = (Income − Spending) ÷ Income." />
                       </div>
                       <div className="big-number" style={{ cursor: "default" }}>{formatPct(savingsRate, 2)}</div>
                     </div>
@@ -950,16 +966,15 @@ useEffect(() => {
                     <div className="tile">
                       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Leftover money</div>
-                        <Tip text="Leftover = income − spending. This is what you choose how to direct." />
+                        <Tip text="Formula: monthly income − monthly spending." />
                       </div>
                       <div className="big-number" style={{ cursor: "default" }}>{formatMoney(leftoverMonthly)}</div>
-                      
                     </div>
 
                     <div className="tile">
                       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Retirement target</div>
-                        <Tip text={`Annual spending ÷ withdrawal rate (${formatPct(swr, 2)}).`} />
+                        <Tip text={`Assumes withdrawal rate ${(swr * 100).toFixed(2)}%. Toggle whether to include temporary spending.`} />
                       </div>
 
                       <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -979,30 +994,21 @@ useEffect(() => {
                         </button>
                       </div>
 
-                      <div className="big-number" style={{ cursor: "default" }}>
+                      <div className="big-number" style={{ cursor: "default", marginTop: 10 }}>
                         {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
                       </div>
-</div>
+                    </div>
                   </div>
 
                   <div className="note">
                     <div className="small">
-                      This is a mirror, not a grade. You’re seeing what your life implies — and you get to decide what changes, if any.
+                      You’re seeing what your life implies — and you get to decide what changes, if any.
                     </div>
                   </div>
-                      <div className="small muted" style={{ marginTop: 6 }}>Refine how spending reflects what matters.</div>
-                    </button>
-                    <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("goals")}>
-                      <div style={{ fontWeight: 850 }}>Savings Goals</div>
-                      <div className="small muted" style={{ marginTop: 6 }}>See how today’s choices affect future plans.</div>
-                    </button>
-                    <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("about")}>
-                      <div style={{ fontWeight: 850 }}>About</div>
-                      <div className="small muted" style={{ marginTop: 6 }}>What “Ikigai” means here.</div>
-                    </button>
-                  </div>
+
+                  {/* P1: add summary charts here */}
                 </div>
-              )}
+                            )}
             </div>
           </div>
         )}
