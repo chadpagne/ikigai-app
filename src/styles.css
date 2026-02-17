@@ -477,3 +477,29 @@ body.dark option {
   color: var(--text);
 }
 .input::placeholder { color: var(--muted); opacity: 0.75; }
+
+
+/* P1: expandable/drag lists */
+.item-row { padding: 12px; }
+.item-row.expanded { border-color: rgba(58,159,191,0.35); }
+.item-main {
+  display: block;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.item-title { font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.xbtn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 20px;
+  line-height: 1;
+}
+.goal-wrap { padding: 0; }
