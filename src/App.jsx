@@ -134,8 +134,13 @@ function Tip({ text }) {
 
   function openAt(e) {
     const r = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2));
-    const top = Math.min(window.innerHeight - 12, r.bottom + 10);
+    const TIP_PAD = 12;
+    const TIP_MAX_W = 280; // keep in sync with CSS max-width
+    const centerX = r.left + r.width / 2;
+    const minLeft = TIP_PAD + TIP_MAX_W / 2;
+    const maxLeft = window.innerWidth - TIP_PAD - TIP_MAX_W / 2;
+    const left = Math.min(maxLeft, Math.max(minLeft, centerX));
+    const top = Math.min(window.innerHeight - TIP_PAD, r.bottom + 10);
     setPos({ left, top });
     setOpen(true);
   }
@@ -285,7 +290,7 @@ const PROJECTED = `repeating-linear-gradient(
           style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}
         >
           <div className="small muted">{footer ?? ""}</div>
-          <Tip text="Solid = what you have now. Stripes = what your current $/mo can reach by your end date (or next 12 months)." />
+          
         </div>
       </div>
     </div>
@@ -945,16 +950,16 @@ useEffect(() => {
                     <div className="tile">
                       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Leftover money</div>
-                        <Tip text="This is the part of your money you actively choose how to direct." />
+                        <Tip text="Leftover = income − spending. This is what you choose how to direct." />
                       </div>
                       <div className="big-number" style={{ cursor: "default" }}>{formatMoney(leftoverMonthly)}</div>
-                      <div className="small muted">Monthly income − monthly spending.</div>
+                      
                     </div>
 
                     <div className="tile">
                       <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                         <div className="label">Retirement target</div>
-                        <Tip text="This adjusts as your Ikigai evolves." />
+                        <Tip text={`Annual spending ÷ withdrawal rate (${formatPct(swr, 2)}).`} />
                       </div>
 
                       <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -977,8 +982,7 @@ useEffect(() => {
                       <div className="big-number" style={{ cursor: "default" }}>
                         {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
                       </div>
-                      <div className="small muted">Uses withdrawal rate {formatPct(swr, 2)}.</div>
-                    </div>
+</div>
                   </div>
 
                   <div className="note">
@@ -986,10 +990,6 @@ useEffect(() => {
                       This is a mirror, not a grade. You’re seeing what your life implies — and you get to decide what changes, if any.
                     </div>
                   </div>
-
-                  <div className="grid-3 home-shortcuts">
-                    <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("ikigai")}>
-                      <div style={{ fontWeight: 850 }}>Build Your Ikigai</div>
                       <div className="small muted" style={{ marginTop: 6 }}>Refine how spending reflects what matters.</div>
                     </button>
                     <button className="tile" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setActiveTab("goals")}>
