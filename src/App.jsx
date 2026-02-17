@@ -1135,47 +1135,6 @@ useEffect(() => {
   )}
 </div>
 
-                <div className="grid-2" style={{ marginTop: 10 }}>
-                  <div className="field">
-                    <div className="label">Need / Want</div>
-                    <select
-                      value={quickDraft.needWant}
-                      onChange={(e) => setQuickDraft((d) => ({ ...d, needWant: e.target.value }))}
-                    >
-                      <option value="need">Need</option>
-                      <option value="want">Want</option>
-                    </select>
-                  </div>
-
-                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
-                    <label className="row small" style={{ alignItems: "center", gap: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={quickDraft.temporary}
-                        onChange={(e) => setQuickDraft((d) => ({ ...d, temporary: e.target.checked }))}
-                      />
-                      Temporary
-                    </label>
-
-                    {quickDraft.temporary ? (
-                      <div className="field" style={{ flex: 1 }}>
-                        <div className="label">Ends (optional)</div>
-                        <input
-                          className="input"
-                          type="date"
-                          value={quickDraft.endDate}
-                          onChange={(e) => setQuickDraft((d) => ({ ...d, endDate: e.target.value }))}
-                        />
-                      </div>
-                    ) : null}
-
-                    <button className="btn primary right" onClick={addQuickItem}>
-                      <Plus size={16} /> Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-
               <div className="grid-2">
                 {/* Left: item list */}
                 <div>
