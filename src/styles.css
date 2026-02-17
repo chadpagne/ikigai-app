@@ -5,6 +5,7 @@
   --bg:#f5f7f7;
   --card:rgba(255,255,255,0.92);
   --tile:rgba(255,255,255,0.92);
+  --input:rgba(255,255,255,0.88);
 
   --text:rgba(0,0,0,0.88);
   --muted:rgba(0,0,0,0.56);
@@ -16,6 +17,7 @@ body.dark{
   --bg:#0b0f12;
   --card:rgba(18,24,28,0.92);
   --tile:rgba(18,24,28,0.92);
+  --input:rgba(255,255,255,0.06);
 
   --text:rgba(255,255,255,0.90);
   --muted:rgba(255,255,255,0.62);
@@ -171,7 +173,7 @@ body.dark .header{
   padding:10px 12px;
   border-radius:12px;
   border:1px solid var(--border);
-  background:transparent;
+  background:var(--input);
   color:var(--text);
   outline:none;
 }
@@ -274,7 +276,6 @@ body.dark .header{
 
   /* polish */
   opacity: 0;
-  transform: translateX(-50%) translateY(6px);
   pointer-events: none;
   animation: tipIn 140ms ease-out forwards;
 }
@@ -282,8 +283,8 @@ body.dark .header{
 @keyframes tipIn{
   to{
     opacity: 1;
-    transform: translateX(-50%) translateY(0px);
   }
+}
 }
 
 /* make the "i" look intentional */

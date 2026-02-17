@@ -177,7 +177,7 @@ function Tip({ text }) {
       {open && (
         <span
           className="tooltip-pop"
-          style={{ top: pos.top, left: pos.left, transform: "translateX(-50%)" }}
+          style={isHoverDesktop ? { top: pos.top, left: pos.left, transform: "translateX(-50%)" } : { top: pos.top, left: 12, right: 12, transform: "none" }}
         >
           {text}
         </span>
@@ -457,6 +457,11 @@ useEffect(() => {
       { name: "Want", value: want },
     ].filter((r) => r.value > 0);
   }, [items]);
+  const pieTotal = useMemo(() => {
+    const rows = pieMode === "category" ? spendingByCategory : spendingByNeedWant;
+    return rows.reduce((s, r) => s + safeNum(r.value), 0);
+  }, [pieMode, spendingByCategory, spendingByNeedWant]);
+
 
   const visibleItems = useMemo(() => {
     if (!categoryFilter) return items;
@@ -534,7 +539,7 @@ useEffect(() => {
         id: uid(),
         name,
         category: quickDraft.category,
-        monthly: safeNum(quickDraft.monthly),
+        monthly: quickDraft.monthly,
         needWant: quickDraft.needWant,
         temporary: !!quickDraft.temporary,
         endDate: quickDraft.endDate,
@@ -1201,8 +1206,8 @@ useEffect(() => {
                                 <input
                                   className="input"
                                   inputMode="decimal"
-                                  value={String(it.monthly)}
-                                  onChange={(e) => updateItem(it.id, { monthly: safeNum(e.target.value) })}
+                                  value={it.monthly ?? ""}
+                                  onChange={(e) => updateItem(it.id, { monthly: e.target.value })}
                                 />
                               </div>
 
@@ -1267,7 +1272,7 @@ useEffect(() => {
                             />
                           ))}
                         </Pie>
-                        <ReTooltip formatter={(v) => formatMoney(Number(v))} contentStyle={{ background: "rgba(15,23,42,0.92)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }} itemStyle={{ color: "rgba(255,255,255,0.92)" }} labelStyle={{ color: "rgba(255,255,255,0.72)" }} />
+                        <ReTooltip formatter={(v) => `${formatMoney(Number(v))} (${pieTotal > 0 ? formatPct(Number(v) / pieTotal, 1) : "0%"})`} contentStyle={{ background: "rgba(15,23,42,0.92)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }} itemStyle={{ color: "rgba(255,255,255,0.92)" }} labelStyle={{ color: "rgba(255,255,255,0.72)" }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -1283,13 +1288,7 @@ useEffect(() => {
                   ) : null}
                 </div>
               </div>
-
-              <div className="row" style={{ justifyContent: "flex-end" }}>
-                <button className="btn primary" onClick={() => setActiveTab("goals")}>
-                  Next: Savings Goals →
-                </button>
-              </div>
-            </div>
+</div>
           </div>
         )}
 
