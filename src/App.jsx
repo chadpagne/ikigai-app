@@ -1074,10 +1074,10 @@ useEffect(() => {
               setQuickDraft({ ...quickDraft, category: e.target.value })
             }
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+            {IKIGAI_CATEGORIES.map((c) => (
+<option key={c.name} value={c.name}>
+  {c.name}
+</option>
             ))}
           </select>
         </div>
@@ -1135,43 +1135,6 @@ useEffect(() => {
     </>
   )}
 </div>
-
-                <div className="grid-2" style={{ marginTop: 12 }}>
-                  <div className="field">
-                    <div className="label">Name</div>
-                    <input
-                      className="input"
-                      value={quickDraft.name}
-                      onChange={(e) => setQuickDraft((d) => ({ ...d, name: e.target.value }))}
-                      placeholder="Groceries, Gas, Gym, Coffee"
-                    />
-                  </div>
-
-                  <div className="grid-2" style={{ gap: 10 }}>
-                    <div className="field">
-                      <div className="label">Category</div>
-                      <select
-                        value={quickDraft.category}
-                        onChange={(e) => setQuickDraft((d) => ({ ...d, category: e.target.value }))}
-                      >
-                        {IKIGAI_CATEGORIES.map((c) => (
-                          <option key={c.name}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="field">
-                      <div className="label">Monthly</div>
-                      <input
-                        className="input"
-                        inputMode="numeric"
-                        value={quickDraft.monthly}
-                        onChange={(e) => setQuickDraft((d) => ({ ...d, monthly: e.target.value }))}
-                        placeholder="e.g., 450"
-                      />
-                    </div>
-                  </div>
-                </div>
 
                 <div className="grid-2" style={{ marginTop: 10 }}>
                   <div className="field">
