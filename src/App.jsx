@@ -1002,26 +1002,138 @@ useEffect(() => {
                 <p className="sub">Some parts of life are essential. Others bring meaning. Most are a mix.</p>
               </div>
 
-              <div className="note">
-                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-  <div style={{ flex: 1, minWidth: 260 }}>
-    <div style={{ fontWeight: 850 }}>Quick Add</div>
+            <div className="note">
+  {/* Header */}
+  <div
+    className="row"
+    style={{
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap",
+    }}
+  >
+    <div style={{ flex: 1, minWidth: 260 }}>
+      <div style={{ fontWeight: 850 }}>Quick Add</div>
 
-    <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-      <button type="button" className={"pill " + (!guidedAdd ? "active" : "")} onClick={() => setGuidedAdd(false)}>
-        Simple
-      </button>
-      <button type="button" className={"pill " + (guidedAdd ? "active" : "")} onClick={() => setGuidedAdd(true)}>
-        Guided
-      </button>
+      {/* Toggle */}
+      <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className={"pill " + (!guidedAdd ? "active" : "")}
+          onClick={() => setGuidedAdd(false)}
+        >
+          Simple
+        </button>
+        <button
+          type="button"
+          className={"pill " + (guidedAdd ? "active" : "")}
+          onClick={() => setGuidedAdd(true)}
+        >
+          Guided
+        </button>
+      </div>
+
+      <div className="small muted" style={{ marginTop: 6 }}>
+        Add one item at a time. Everything updates instantly.
+      </div>
     </div>
 
-    <div className="small muted" style={{ marginTop: 6 }}>
-      Add one item at a time. Everything updates instantly.
-    </div>
+    <Tip text="Examples: Groceries, Gas, Gym, Coffee, Rent, Pet food, Streaming." />
   </div>
 
-  <Tip text="Examples: Groceries, Gas, Gym, Coffee, Rent, Pet food, Streaming." />
+  {/* ⬇️ THIS IS THE IMPORTANT PART ⬇️ */}
+  {guidedAdd ? (
+    /* GUIDED MODE (placeholder for now) */
+    <div className="note" style={{ marginTop: 12 }}>
+      <div style={{ fontWeight: 650, marginBottom: 6 }}>Guided mode</div>
+      <div className="small muted">
+        We’ll walk you through common expenses step by step.
+      </div>
+    </div>
+  ) : (
+    /* SIMPLE MODE (YOUR EXISTING QUICK ADD FORM) */
+    <>
+      <div className="row" style={{ gap: 12, marginTop: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div className="small muted">Name</div>
+          <input
+            value={quickDraft.name}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, name: e.target.value })
+            }
+            placeholder="Groceries, Gas, Gym, Coffee"
+          />
+        </div>
+
+        <div style={{ minWidth: 160 }}>
+          <div className="small muted">Category</div>
+          <select
+            value={quickDraft.category}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, category: e.target.value })
+            }
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ minWidth: 140 }}>
+          <div className="small muted">Monthly</div>
+          <input
+            value={quickDraft.monthly}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, monthly: e.target.value })
+            }
+            placeholder="e.g. 450"
+          />
+        </div>
+      </div>
+
+      <div
+        className="row"
+        style={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 12,
+        }}
+      >
+        <div className="row" style={{ gap: 12 }}>
+          <select
+            value={quickDraft.needWant}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, needWant: e.target.value })
+            }
+          >
+            <option value="need">Need</option>
+            <option value="want">Want</option>
+          </select>
+
+          <label className="row small muted" style={{ gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={quickDraft.temporary}
+              onChange={(e) =>
+                setQuickDraft({
+                  ...quickDraft,
+                  temporary: e.target.checked,
+                })
+              }
+            />
+            Temporary
+          </label>
+        </div>
+
+        <button className="btn primary" onClick={addQuickItem}>
+          + Add
+        </button>
+      </div>
+    </>
+  )}
 </div>
 
                 <div className="grid-2" style={{ marginTop: 12 }}>
