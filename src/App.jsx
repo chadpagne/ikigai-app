@@ -1181,7 +1181,7 @@ useEffect(() => {
       </div>
     </>
   )}
-</div>
+            </div>
 
               <div className="grid-2">
                 {/* Left: item list */}
@@ -1339,7 +1339,11 @@ useEffect(() => {
                           </div>
                         );
                       })
-                    )}                {/* Right: summary pie */}
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: summary pie */}
                 <div className="tile">
                   <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                     <div style={{ flex: 1 }}>
@@ -1397,7 +1401,7 @@ useEffect(() => {
                   ) : null}
                 </div>
               </div>
-</div>
+            </div>
           </div>
         )}
 
