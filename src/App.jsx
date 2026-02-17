@@ -208,17 +208,15 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status,
   const cur = clamp01(currentPct);
   const proj = clamp01(projectedPct);
 
-  // Current fill: darker blue
- const CURRENT = "rgba(58,159,191,1)"; // full opacity
+const CURRENT = "rgb(58,159,191)";
 
-  // Projected overlay: lighter + striped so it’s obvious
-  const PROJECTED = `repeating-linear-gradient(
-    135deg,
-    rgba(58,159,191,0.18) 0px,
-    rgba(58,159,191,0.18) 8px,
-    rgba(58,159,191,0.06) 8px,
-    rgba(58,159,191,0.06) 16px
-  )`;
+const PROJECTED = `repeating-linear-gradient(
+  135deg,
+  rgba(58,159,191,0.18) 0px,
+  rgba(58,159,191,0.18) 8px,
+  rgba(58,159,191,0.06) 8px,
+  rgba(58,159,191,0.06) 16px
+)`;
 
   return (
     <div
@@ -230,22 +228,23 @@ function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status,
         overflow: "hidden",
       }}
     >
-      {/* projected fill (behind) */}
-      <div
-        className="progress-fill"
-        style={{
-          background: PROJECTED,
-          height: `${proj * 100}%`,
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1,
-        }}
-      />
+ {/* projected fill (behind) */}
+<div
+  className="progress-fill"
+  style={{
+    background: PROJECTED,
+    height: `${proj * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.55,
+    zIndex: 1,
+  }}
+/>
 
-      {/* current fill (on top) */}
-      <div
+{/* current fill (on top) */}
+<div
   className="progress-fill"
   style={{
     background: CURRENT,
