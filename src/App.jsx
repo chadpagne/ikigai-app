@@ -79,6 +79,33 @@ function isSameMonthKey(a, b) {
   return a === b;
 }
 
+
+function getCategoryExamples(category) {
+  const map = {
+    "Housing": ["Rent", "Mortgage", "HOA", "Maintenance"],
+    "Car / Transportation": ["Gas", "Car payment", "Insurance", "Parking"],
+    "Food & Drink": ["Groceries", "Dining out", "Coffee"],
+    "Utilities": ["Electric", "Internet", "Phone"],
+    "Insurance": ["Health insurance", "Car insurance", "Home insurance"],
+    "Health & Fitness": ["Gym", "Therapy", "Supplements"],
+    "Subscriptions": ["Netflix", "Spotify", "iCloud"],
+    "Travel & Vacation": ["Flights", "Hotels", "Weekend trips"],
+    "Pet": ["Pet food", "Vet", "Grooming"],
+  };
+  return map[category] ?? ["Groceries", "Gas", "Gym", "Coffee"];
+}
+function getCategoryPlaceholder(category) {
+  const ex = getCategoryExamples(category)[0];
+  return ex ? `e.g., ${ex}` : "e.g., Groceries";
+}
+function savingsRateGrade(r) {
+  // Heuristic grading (tweakable later)
+  if (r >= 0.35) return { label: "Great", tone: "good" };
+  if (r >= 0.20) return { label: "Good", tone: "good" };
+  if (r >= 0.10) return { label: "OK", tone: "warn" };
+  return { label: "Needs improvement", tone: "warn" };
+}
+
 // Data
 const IKIGAI_CATEGORIES = [
   { name: "Housing", color: "#7aa6a1" },
@@ -351,6 +378,8 @@ export default function App() {
   const [netWorthHistory, setNetWorthHistory] = useState([]);
 
   const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
+  const [spendListView, setSpendListView] = useState("monthly"); // monthly | annual (list rows)
+  const [goalListView, setGoalListView] = useState("monthly"); // monthly | annual (list rows)
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
 
@@ -358,7 +387,9 @@ export default function App() {
   const [categoryFilter, setCategoryFilter] = useState(null);
   const [expandedItemId, setExpandedItemId] = useState(null);
   const [dragItemId, setDragItemId] = useState(null);
+  const [dragOverItemId, setDragOverItemId] = useState(null);
   const [dragGoalId, setDragGoalId] = useState(null);
+  const [dragOverGoalId, setDragOverGoalId] = useState(null);
   const [expandedGoalId, setExpandedGoalId] = useState(null);
 
   // Theme apply
@@ -701,7 +732,7 @@ useEffect(() => {
 ) : null}
           <div className="nav" role="navigation" aria-label="Primary">
             <TabButton id="home" label="Home" Icon={HomeIcon} />
-            <TabButton id="ikigai" label="Build Your Ikigai" Icon={Wallet} />
+            <TabButton id="ikigai" label="Your Ikigai" Icon={Wallet} />
             <TabButton id="goals" label="Savings" Icon={PiggyBank} />
             <TabButton id="networth" label="Net Worth" Icon={LineChartIcon} />
             <TabButton id="retirement" label="Retirement" Icon={BarChart3} />
@@ -723,7 +754,7 @@ useEffect(() => {
               <h3 style={{ margin: "8px 0" }}>Navigate</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button className="btn outline" onClick={() => (setActiveTab("home"), setDrawerOpen(false))}>Home</button>
-                <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Build Your Ikigai</button>
+                <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Your Ikigai</button>
                 <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings</button>
                 <button className="btn outline" onClick={() => (setActiveTab("networth"), setDrawerOpen(false))}>Net Worth</button>
                 <button className="btn outline" onClick={() => (setActiveTab("retirement"), setDrawerOpen(false))}>Retirement</button>
@@ -1045,7 +1076,7 @@ useEffect(() => {
           <div className="card">
             <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
-                <h2 className="h1">Build Your Ikigai</h2>
+                <h2 className="h1">Your Ikigai</h2>
                 <p className="sub">Some parts of life are essential. Others bring meaning. Most are a mix.</p>
               </div>
 
@@ -1091,12 +1122,142 @@ useEffect(() => {
 
   {/* ⬇️ THIS IS THE IMPORTANT PART ⬇️ */}
   {guidedAdd ? (
-    /* GUIDED MODE (placeholder for now) */
+    /* GUIDED MODE */
     <div className="note" style={{ marginTop: 12 }}>
-      <div style={{ fontWeight: 650, marginBottom: 6 }}>Guided mode</div>
-      <div className="small muted">
-        We’ll walk you through common expenses step by step.
-      </div>
+      <div className="kicker">Guided add • Step {guidedStep} of 4</div>
+
+      {guidedStep === 1 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Choose a category</div>
+          <select
+            value={quickDraft.category}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, category: e.target.value }))}
+          >
+            {IKIGAI_CATEGORIES.map((c) => (
+              <option key={c.name}>{c.name}</option>
+            ))}
+          </select>
+
+          <div className="small muted">
+            Examples:{" "}
+            {getCategoryExamples(quickDraft.category).map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                className="chip"
+                onClick={() => setQuickDraft((d) => ({ ...d, name: ex }))}
+                style={{ marginRight: 8, marginTop: 6 }}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+
+          <div className="row" style={{ justifyContent: "flex-end", marginTop: 6 }}>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(2)}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 2 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Name the expense</div>
+          <input
+            className="input"
+            value={quickDraft.name}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder={getCategoryPlaceholder(quickDraft.category)}
+          />
+          <div className="small muted">Pick one of the examples above, or type your own.</div>
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(1)}>
+              Back
+            </button>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(3)} disabled={!quickDraft.name.trim()}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 3 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Monthly cost</div>
+          <input
+            className="input"
+            inputMode="decimal"
+            value={quickDraft.monthly}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, monthly: e.target.value }))}
+            placeholder="e.g., 450"
+          />
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(2)}>
+              Back
+            </button>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(4)} disabled={!String(quickDraft.monthly).trim()}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 4 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Details</div>
+
+          <div className="grid-2" style={{ gap: 10 }}>
+            <div className="field">
+              <div className="label">Need / Want</div>
+              <select
+                value={quickDraft.needWant}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, needWant: e.target.value }))}
+              >
+                <option value="need">Need</option>
+                <option value="want">Want</option>
+              </select>
+            </div>
+
+            <label className="row small" style={{ alignItems: "center", gap: 8, marginTop: 24 }}>
+              <input
+                type="checkbox"
+                checked={quickDraft.temporary}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, temporary: e.target.checked }))}
+              />
+              Temporary
+            </label>
+          </div>
+
+          {quickDraft.temporary ? (
+            <div className="field">
+              <div className="label">Ends (optional)</div>
+              <input
+                className="input"
+                type="date"
+                value={quickDraft.endDate}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, endDate: e.target.value }))}
+              />
+            </div>
+          ) : null}
+
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(3)}>
+              Back
+            </button>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() => {
+                addQuickItem();
+                setGuidedStep(1);
+              }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   ) : (
     /* SIMPLE MODE (YOUR EXISTING QUICK ADD FORM) */
@@ -1188,7 +1349,12 @@ useEffect(() => {
                 <div>
                   <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                      <Pill active={spendListView === "monthly"} label="Monthly" onClick={() => setSpendListView("monthly")} />
+                      <Pill active={spendListView === "annual"} label="Annual" onClick={() => setSpendListView("annual")} />
+                      
                     <Tip text="This is a mirror, not a grade. You can change anything." />
+                    </div>
                   </div>
 
                   {categoryFilter ? (
@@ -1212,7 +1378,16 @@ useEffect(() => {
                             key={it.id}
                             className={"tile item-row " + (isExpanded ? "expanded" : "")}
                             draggable
-                            onDragStart={() => setDragItemId(it.id)}
+                            onDragStart={(e) => {
+                            setDragItemId(it.id);
+                            try {
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", String(it.id));
+                            } catch {}
+                          }}
+                          onDragEnd={() => { setDragItemId(null); setDragOverItemId(null); }}
+                          onDragEnter={() => setDragOverItemId(it.id)}
+                          onDragLeave={() => setDragOverItemId((cur) => (cur === it.id ? null : cur))}
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={() => {
                               if (dragItemId && dragItemId !== it.id) moveItem(dragItemId, it.id);
@@ -1494,7 +1669,16 @@ useEffect(() => {
                         className="goal-wrap"
                         style={{ display: "flex", flexDirection: "column", gap: 10 }}
                         draggable
-                        onDragStart={() => setDragGoalId(g.id)}
+                        onDragStart={(e) => {
+                          setDragGoalId(g.id);
+                          try {
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", String(g.id));
+                          } catch {}
+                        }}
+                        onDragEnd={() => { setDragGoalId(null); setDragOverGoalId(null); }}
+                        onDragEnter={() => setDragOverGoalId(g.id)}
+                        onDragLeave={() => setDragOverGoalId((cur) => (cur === g.id ? null : cur))}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={() => {
                           if (dragGoalId && dragGoalId !== g.id) moveGoal(dragGoalId, g.id);
