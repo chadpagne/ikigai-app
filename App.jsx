@@ -364,7 +364,9 @@ export default function App() {
   const [liabDraft, setLiabDraft] = useState({ name: "", balance: "" });
   const [netWorthHistory, setNetWorthHistory] = useState([]);
 
-  const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
+  const [spendingView, setSpendingView] = useState("monthly");
+  const [rowMoneyMode, setRowMoneyMode] = useState("monthly"); // affects list row display
+ // monthly | annual
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
 
@@ -807,7 +809,7 @@ useEffect(() => {
                               <div className="label">Kids</div>
                               <input
                                 className="input"
-                                inputMode="numeric"
+                                inputMode="decimal"
                                 value={profile.kids}
                                 onChange={(e) => setProfile({ ...profile, kids: e.target.value })}
                               />
@@ -816,7 +818,7 @@ useEffect(() => {
                               <div className="label">Pets</div>
                               <input
                                 className="input"
-                                inputMode="numeric"
+                                inputMode="decimal"
                                 value={profile.pets}
                                 onChange={(e) => setProfile({ ...profile, pets: e.target.value })}
                               />
@@ -1202,6 +1204,23 @@ useEffect(() => {
                 <div>
                   <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                    <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      <div className="small muted" style={{ marginRight: 6 }}>Rows:</div>
+                      <button
+                        type="button"
+                        className={"pill " + (rowMoneyMode === 'monthly' ? 'active' : '')}
+                        onClick={() => setRowMoneyMode('monthly')}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        className={"pill " + (rowMoneyMode === 'annual' ? 'active' : '')}
+                        onClick={() => setRowMoneyMode('annual')}
+                      >
+                        Annual
+                      </button>
+                    </div>
                   <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <div className="row" style={{ gap: 6, alignItems: "center" }}>
                       <button type="button" className={"pill " + (spendingView === "monthly" ? "active" : "")} onClick={() => setSpendingView("monthly")}>Monthly</button>
