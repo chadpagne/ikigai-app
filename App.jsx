@@ -1,0 +1,2279 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Plus,
+  Trash2,
+  Home as HomeIcon,
+  Wallet,
+  PiggyBank,
+  BarChart3,
+  LineChart as LineChartIcon,
+  Menu,
+  Info,
+  ChevronDown,
+  Shield,
+  Sparkles,
+  Moon,
+  Sun,
+} from "lucide-react";
+
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    // Keep this very noisy for now so we can debug production "white screens".
+    console.error("Ikigai runtime error:", error);
+    console.error(info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 16 }}>
+          <div className="card">
+            <div className="card-body">
+              <div style={{ fontWeight: 900, marginBottom: 8 }}>Something went wrong</div>
+              <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>
+                {String(this.state.error?.message || this.state.error)}
+              </div>
+              <div className="row" style={{ gap: 10, marginTop: 14 }}>
+                <button className="btn primary" onClick={() => window.location.reload()}>
+                  Reload
+                </button>
+                <button className="btn outline" onClick={() => this.setState({ error: null })}>
+                  Dismiss
+                </button>
+              </div>
+              <div className="small muted" style={{ marginTop: 10 }}>
+                Open DevTools → Console to see the full stack trace.
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip as ReTooltip,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from "recharts";
+
+/**
+ * Ikigai v0.4.2 (deployable)
+ * - Vite + React
+ * - localStorage persistence
+ * - Guided onboarding (first time only)
+ * - Tabs: Home, Build Your Ikigai, Savings, Net Worth, Retirement, About
+ * - Dark mode fixed for tiles + nav text (CSS patch below)
+ * - Mobile tooltip clamped to viewport (fixed here)
+ * - Pie drill-down by category
+ */
+
+const BRAND_GREEN = "#2f7f6f";
+const BRAND_BLUE = "#3a9fbf";
+
+// Helpers
+function uid() {
+  try {
+    // crypto is only available in secure contexts; guard for safety.
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return "id_" + Math.random().toString(36).slice(2) + "_" + Date.now().toString(36);
+}
+function safeNum(v) {
+  if (v === null || v === undefined) return 0;
+  // Allow users to paste "$1,234.56" etc.
+  const s = typeof v === "string" ? v.trim().replace(/[$,\s]/g, "") : v;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+function formatMoney(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000) return `$${Math.round(n).toLocaleString()}`;
+  return `$${n.toFixed(0)}`;
+}
+function formatPct(n, decimals = 2) {
+  return `${(n * 100).toFixed(decimals)}%`;
+}
+function monthKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function monthsBetween(from, toISO) {
+  const to = new Date(toISO);
+  const a = from.getFullYear() * 12 + from.getMonth();
+  const b = to.getFullYear() * 12 + to.getMonth();
+  return Math.max(0, b - a);
+}
+function isSameMonthKey(a, b) {
+  return a === b;
+}
+
+
+function getCategoryExamples(category) {
+  const map = {
+    "Housing": ["Rent", "Mortgage", "HOA", "Maintenance"],
+    "Car / Transportation": ["Gas", "Car payment", "Insurance", "Parking"],
+    "Food & Drink": ["Groceries", "Dining out", "Coffee"],
+    "Utilities": ["Electric", "Internet", "Phone"],
+    "Insurance": ["Health insurance", "Car insurance", "Home insurance"],
+    "Health & Fitness": ["Gym", "Therapy", "Supplements"],
+    "Subscriptions": ["Netflix", "Spotify", "iCloud"],
+    "Travel & Vacation": ["Flights", "Hotels", "Weekend trips"],
+    "Pet": ["Pet food", "Vet", "Grooming"],
+  };
+  return map[category] ?? ["Groceries", "Gas", "Gym", "Coffee"];
+}
+function getCategoryPlaceholder(category) {
+  const ex = getCategoryExamples(category)[0];
+  return ex ? `e.g., ${ex}` : "e.g., Groceries";
+}
+function savingsRateGrade(r) {
+  // Heuristic grading (tweakable later)
+  if (r >= 0.35) return { label: "Great", tone: "good" };
+  if (r >= 0.20) return { label: "Good", tone: "good" };
+  if (r >= 0.10) return { label: "OK", tone: "warn" };
+  return { label: "Needs improvement", tone: "warn" };
+}
+
+// Data
+const IKIGAI_CATEGORIES = [
+  { name: "Housing", color: "#7aa6a1" },
+  { name: "Car / Transportation", color: "#a0a9b8" },
+  { name: "Food & Drink", color: "#d1a06a" },
+  { name: "Utilities", color: "#8aa4c6" },
+  { name: "Insurance", color: "#93b8a0" },
+  { name: "Health & Fitness", color: "#b88fb7" },
+  { name: "Personal Care", color: "#c6a48a" },
+  { name: "Entertainment", color: "#caa1a7" },
+  { name: "Household", color: "#9fb0a2" },
+  { name: "Gifts", color: "#a8b6c7" },
+  { name: "Clothing", color: "#a8a6c7" },
+  { name: "Subscriptions", color: "#b1b1b1" },
+  { name: "Travel & Vacation", color: "#7fb6c4" },
+  { name: "Taxes", color: "#b6a07f" },
+  { name: "Education", color: "#b6a07f" },
+  { name: "Donations", color: "#9ab6c4" },
+  { name: "Debt payments", color: "#c08f7e" },
+  { name: "Fees", color: "#9e9e9e" },
+  { name: "Pet", color: "#a7b98b" },
+  { name: "Other", color: "#8f9aa7" },
+];
+
+const GOAL_PRESETS = [
+  "Emergency",
+  "Vacation",
+  "Occasion",
+  "Home down payment",
+  "Car down payment",
+  "Education",
+  "Other",
+];
+
+const DEFAULT_PROFILE = {
+  age: "",
+  location: "",
+  relationship: "",
+  kids: "0",
+  pets: "0",
+  // NOTE: monthly is string to avoid the "0 sticks while typing" issue
+  incomeSources: [{ id: uid(), name: "Salary", monthly: "" }],
+};
+
+function Tip({ text }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 12, left: 12 });
+
+  const isHoverDesktop = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  }, []);
+
+  function openAt(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const TIP_PAD = 12;
+    const TIP_MAX_W = 240;
+    const maxWidth = Math.min(TIP_MAX_W, window.innerWidth - TIP_PAD * 2);
+
+    const half = maxWidth / 2;
+    const centerX = r.left + r.width / 2;
+    const left = Math.min(window.innerWidth - TIP_PAD - half, Math.max(TIP_PAD + half, centerX));
+
+    // try below; if it would go off-screen, flip above
+    const below = r.bottom + 10;
+    const above = r.top - 10;
+    const TIP_H = 84;
+
+    const top =
+      below + TIP_H > window.innerHeight - TIP_PAD
+        ? Math.max(TIP_PAD, above - TIP_H)
+        : Math.min(window.innerHeight - TIP_PAD, below);
+
+    setPos({ left, top, maxWidth });
+    setOpen(true);
+  }
+
+
+  useEffect(() => {
+    function onDoc(e) {
+      if (!open) return;
+      const t = e.target;
+      if (t && t.closest && t.closest(".tooltip-wrap")) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("touchstart", onDoc, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("touchstart", onDoc);
+    };
+  }, [open]);
+
+  return (
+    <span className="tooltip-wrap" style={{ display: "inline-flex" }}>
+      <button
+        type="button"
+        className="tip-i"
+        aria-label="Info"
+        onClick={(e) => {
+          if (!isHoverDesktop) {
+            open ? setOpen(false) : openAt(e);
+          }
+        }}
+        onMouseEnter={(e) => {
+          if (isHoverDesktop) openAt(e);
+        }}
+        onMouseLeave={() => {
+          if (isHoverDesktop) setOpen(false);
+        }}
+      ><Info size={14} /></button>
+
+      {open && (
+        <span
+          className="tooltip-pop"
+          style={isHoverDesktop ? { top: pos.top, left: pos.left, transform: "translateX(-50%)" } : { top: pos.top, left: 12, right: 12, transform: "none" }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Pill({ active, label, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className={"pill " + (active ? "active" : "")}>
+      {label}
+    </button>
+  );
+}
+
+function NeedWantBadge({ value }) {
+  const isNeed = value === "need";
+  const Icon = isNeed ? Shield : Sparkles;
+  return (
+    <span className={"badge " + (isNeed ? "good" : "warn")} title={isNeed ? "Need" : "Want"}>
+      <Icon size={14} />
+      {isNeed ? "Need" : "Want"}
+    </span>
+  );
+}
+
+function BucketTile({ title, subtitle, currentPct, projectedPct, footer, status, onClick }) {
+  const cur = clamp01(currentPct);
+  const proj = clamp01(projectedPct);
+
+const CURRENT = "rgb(58,159,191)";
+
+const PROJECTED = `repeating-linear-gradient(
+  135deg,
+  rgba(58,159,191,0.18) 0px,
+  rgba(58,159,191,0.18) 8px,
+  rgba(58,159,191,0.06) 8px,
+  rgba(58,159,191,0.06) 16px
+)`;
+
+  return (
+    <div
+      className="tile progress-tile"
+      onClick={onClick}
+      style={{
+        cursor: onClick ? "pointer" : "default",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+ {/* projected fill (behind) */}
+<div
+  className="progress-fill"
+  style={{
+    background: PROJECTED,
+    height: `${proj * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.55,
+    zIndex: 1,
+  }}
+/>
+
+{/* current fill (on top) */}
+<div
+  className="progress-fill"
+  style={{
+    background: CURRENT,
+    height: `${cur * 100}%`,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    opacity: 1,
+  }}
+/>
+
+      <div style={{ position: "relative", zIndex: 3 }}>
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 750 }}>{title}</div>
+            {subtitle ? (
+              <div className="small muted" style={{ marginTop: 4 }}>
+                {subtitle}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="row" style={{ gap: 8, alignItems: "center" }}>
+            {status ? (
+              <span className={"badge " + (status === "on_track" ? "good" : "warn")}>
+                {status === "on_track" ? "On track" : "Behind"}
+              </span>
+            ) : null}
+            <div style={{ fontWeight: 850 }}>{Math.round(cur * 100)}%</div>
+          </div>
+        </div>
+
+        <div
+          className="row"
+          style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}
+        >
+          <div className="small muted">{footer ?? ""}</div>
+          
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppInner() {
+  // App state
+  const [activeTab, setActiveTab] = useState("home"); // home | ikigai | goals | networth | retirement | about
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem("ikigai_theme") || "light"; } catch { return "light"; }
+  });
+
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardingDone, setOnboardingDone] = useState(false);
+  const [editingBasics, setEditingBasics] = useState(false);
+
+  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+
+  const [guidedAdd, setGuidedAdd] = useState(false);
+  const [guidedStep, setGuidedStep] = useState(1);
+
+  const [items, setItems] = useState([]);
+  const [quickDraft, setQuickDraft] = useState({
+    name: "",
+    category: "Other",
+    monthly: "",
+    needWant: "need",
+    temporary: false,
+    endDate: "",
+  });
+
+  const [goals, setGoals] = useState([]);
+  const [goalDraft, setGoalDraft] = useState({
+    name: "",
+    category: "Emergency",
+    target: "",
+    current: "",
+    monthly: "",
+    endDate: "",
+  });
+
+  const [assets, setAssets] = useState([]);
+  const [liabilities, setLiabilities] = useState([]);
+  const [assetDraft, setAssetDraft] = useState({ name: "", value: "", type: "Investment" });
+  const [liabDraft, setLiabDraft] = useState({ name: "", balance: "" });
+  const [netWorthHistory, setNetWorthHistory] = useState([]);
+
+  const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
+  const [spendListView, setSpendListView] = useState("monthly"); // monthly | annual (list rows)
+  const [goalListView, setGoalListView] = useState("monthly"); // monthly | annual (list rows)
+  const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
+  const [swr, setSwr] = useState(0.04);
+  const [swrText, setSwrText] = useState(() => (0.04 * 100).toFixed(2));
+
+  const [pieMode, setPieMode] = useState("category"); // category | needwant
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [expandedItemId, setExpandedItemId] = useState(null);
+  const [dragItemId, setDragItemId] = useState(null);
+  const [dragOverItemId, setDragOverItemId] = useState(null);
+  const [dragGoalId, setDragGoalId] = useState(null);
+  const [dragOverGoalId, setDragOverGoalId] = useState(null);
+  const [expandedGoalId, setExpandedGoalId] = useState(null);
+
+  // Theme apply
+  useEffect(() => {
+    try { localStorage.setItem("ikigai_theme", theme); } catch {}
+    document.body.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+  // Keep SWR text in sync with slider / state (helps mobile editing feel responsive)
+  useEffect(() => {
+    setSwrText((swr * 100).toString());
+  }, [swr]);
+
+// Hash routing (safe)
+const VALID_TABS = useMemo(
+  () => new Set(["home", "ikigai", "goals", "networth", "retirement", "about"]),
+  []
+);
+
+useEffect(() => {
+  function applyHash() {
+    const h = (window.location.hash || "").replace("#", "");
+    if (VALID_TABS.has(h)) {
+      setActiveTab(h);
+    } else if (h) {
+      // unknown hash -> force home
+      setActiveTab("home");
+      window.history.replaceState(null, "", "#home");
+    }
+  }
+
+  applyHash();
+  window.addEventListener("hashchange", applyHash);
+  return () => window.removeEventListener("hashchange", applyHash);
+}, [VALID_TABS]);
+
+useEffect(() => {
+  const h = "#" + activeTab;
+  if (window.location.hash !== h) window.history.pushState(null, "", h);
+}, [activeTab]);
+
+  // Load saved state
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ikigai_v042_state");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed.profile) setProfile(parsed.profile);
+      if (parsed.items) setItems(parsed.items);
+      if (parsed.goals) setGoals(parsed.goals);
+      if (parsed.assets) setAssets(parsed.assets);
+      if (parsed.liabilities) setLiabilities(parsed.liabilities);
+      if (parsed.netWorthHistory) setNetWorthHistory(parsed.netWorthHistory);
+      if (typeof parsed.onboardingDone === "boolean") setOnboardingDone(parsed.onboardingDone);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Save state
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "ikigai_v042_state",
+        JSON.stringify({ profile, items, goals, assets, liabilities, netWorthHistory, onboardingDone })
+      );
+    } catch {
+      // ignore
+    }
+  }, [profile, items, goals, assets, liabilities, netWorthHistory, onboardingDone]);
+
+  // Derived totals
+  const totalIncomeMonthly = useMemo(
+    () => profile.incomeSources.reduce((s, x) => s + safeNum(x.monthly), 0),
+    [profile.incomeSources]
+  );
+
+  const monthlyIkigaiOngoing = useMemo(
+    () => items.filter((i) => !i.temporary).reduce((s, i) => s + safeNum(i.monthly), 0),
+    [items]
+  );
+  const monthlyIkigaiAll = useMemo(() => items.reduce((s, i) => s + safeNum(i.monthly), 0), [items]);
+
+  const monthlySpendForSummary = spendingView === "monthly" ? monthlyIkigaiAll : monthlyIkigaiAll * 12;
+
+  const leftoverMonthly = useMemo(
+    () => Math.max(0, totalIncomeMonthly - monthlyIkigaiAll),
+    [totalIncomeMonthly, monthlyIkigaiAll]
+  );
+
+  const savingsRate = useMemo(() => {
+    if (totalIncomeMonthly <= 0) return 0;
+    return clamp01(leftoverMonthly / totalIncomeMonthly);
+  }, [leftoverMonthly, totalIncomeMonthly]);
+  const savingsGrade = useMemo(() => {
+    // Heuristic: simple, non-judgy labels. Based on leftover/income.
+    if (totalIncomeMonthly <= 0) return { label: "Add income", tone: "muted" };
+    const r = savingsRate;
+    if (r < 0.05) return { label: "Needs improvement", tone: "warn" };
+    if (r < 0.10) return { label: "OK", tone: "neutral" };
+    if (r < 0.20) return { label: "Good", tone: "good" };
+    return { label: "Great", tone: "good" };
+  }, [savingsRate, totalIncomeMonthly]);
+
+  const spentPct = useMemo(() => {
+    if (totalIncomeMonthly <= 0) return 0;
+    return clamp01(monthlyIkigaiAll / totalIncomeMonthly);
+  }, [monthlyIkigaiAll, totalIncomeMonthly]);
+
+  const retirementProgress = useMemo(() => {
+    const target = retirementView === "all" ? retirementTargetAll : retirementTargetOngoing;
+    if (target <= 0) return 0;
+    return clamp01(netWorth / target);
+  }, [netWorth, retirementTargetAll, retirementTargetOngoing, retirementView]);
+
+  const topCategory = useMemo(() => spendingByCategory[0]?.name ?? null, [spendingByCategory]);
+
+  const retirementTargetOngoing = useMemo(() => {
+    const annual = monthlyIkigaiOngoing * 12;
+    if (swr <= 0) return 0;
+    return annual / swr;
+  }, [monthlyIkigaiOngoing, swr]);
+
+  const retirementTargetAll = useMemo(() => {
+    const annual = monthlyIkigaiAll * 12;
+    if (swr <= 0) return 0;
+    return annual / swr;
+  }, [monthlyIkigaiAll, swr]);
+
+  const spendingByCategory = useMemo(() => {
+    const map = new Map();
+    for (const it of items) map.set(it.category, (map.get(it.category) ?? 0) + safeNum(it.monthly));
+    const rows = Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+    rows.sort((a, b) => b.value - a.value);
+    return rows;
+  }, [items]);
+
+  const spendingByNeedWant = useMemo(() => {
+    const need = items.filter((i) => i.needWant === "need").reduce((s, i) => s + safeNum(i.monthly), 0);
+    const want = items.filter((i) => i.needWant === "want").reduce((s, i) => s + safeNum(i.monthly), 0);
+    return [
+      { name: "Need", value: need },
+      { name: "Want", value: want },
+    ].filter((r) => r.value > 0);
+  }, [items]);
+  const pieTotal = useMemo(() => {
+    const rows = pieMode === "category" ? spendingByCategory : spendingByNeedWant;
+    return rows.reduce((s, r) => s + safeNum(r.value), 0);
+  }, [pieMode, spendingByCategory, spendingByNeedWant]);
+
+
+  const visibleItems = useMemo(() => {
+    if (!categoryFilter) return items;
+    return items.filter((i) => i.category === categoryFilter);
+  }, [items, categoryFilter]);
+
+  // Net worth
+  const totalAssets = useMemo(() => assets.reduce((s, a) => s + safeNum(a.value), 0), [assets]);
+  const totalLiabilities = useMemo(() => liabilities.reduce((s, l) => s + safeNum(l.balance), 0), [liabilities]);
+  const netWorth = useMemo(() => totalAssets - totalLiabilities, [totalAssets, totalLiabilities]);
+
+  // Auto snapshot net worth monthly (no manual button)
+  useEffect(() => {
+    const key = monthKey(new Date());
+    setNetWorthHistory((arr) => {
+      if (arr.length > 0 && isSameMonthKey(arr[arr.length - 1].t, key)) return arr;
+      const next = [...arr, { t: key, value: netWorth }];
+      return next.slice(-24);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [netWorth]);
+
+  // Goals progress
+  const goalProgress = useMemo(() => {
+    const now = new Date();
+    return goals.map((g) => {
+      const target = safeNum(g.target);
+      const current = safeNum(g.current);
+      const monthly = safeNum(g.monthly);
+      const mLeft = g.endDate ? monthsBetween(now, g.endDate) : null;
+
+      let pct = 0; // current-only
+      let projectedPct = 0; // current + monthly * horizon
+      let status = null;
+
+      if (target > 0) {
+        pct = clamp01(current / target);
+
+        const horizon = mLeft !== null ? mLeft : 12;
+        projectedPct = clamp01((current + monthly * horizon) / target);
+
+        if (mLeft !== null && mLeft > 0) {
+          const required = Math.max(0, target - current) / mLeft;
+          status = monthly >= required ? "on_track" : "behind";
+        }
+      }
+
+      return { id: g.id, pct, projectedPct, status, mLeft };
+    });
+  }, [goals]);
+
+  // Mutators: profile income
+  function setIncomeSource(id, patch) {
+    setProfile((p) => ({
+      ...p,
+      incomeSources: p.incomeSources.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+    }));
+  }
+  function addIncomeSource(name = "Other income") {
+    setProfile((p) => ({
+      ...p,
+      incomeSources: [...p.incomeSources, { id: uid(), name, monthly: "" }],
+    }));
+  }
+  function removeIncomeSource(id) {
+    setProfile((p) => ({ ...p, incomeSources: p.incomeSources.filter((x) => x.id !== id) }));
+  }
+
+  // Mutators: spending items
+  function addQuickItem() {
+    const name = quickDraft.name.trim();
+    if (!name) return;
+    setItems((arr) => [
+      {
+        id: uid(),
+        name,
+        category: quickDraft.category,
+        monthly: quickDraft.monthly,
+        needWant: quickDraft.needWant,
+        temporary: !!quickDraft.temporary,
+        endDate: quickDraft.endDate,
+      },
+      ...arr,
+    ]);
+    setQuickDraft((d) => ({ ...d, name: "", monthly: "", temporary: false, endDate: "" }));
+  }
+  function updateItem(id, patch) {
+    setItems((arr) => arr.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+  function removeItem(id) {
+    setItems((arr) => arr.filter((x) => x.id !== id));
+  }
+
+  function moveItem(fromId, toId) {
+    setItems((arr) => {
+      const from = arr.findIndex((x) => x.id === fromId);
+      const to = arr.findIndex((x) => x.id === toId);
+      if (from < 0 || to < 0 || from === to) return arr;
+      const next = [...arr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  // Mutators: goals
+  function addGoal() {
+    const name = goalDraft.name.trim();
+    if (!name) return;
+    setGoals((arr) => [
+      {
+        id: uid(),
+        name,
+        category: goalDraft.category,
+        target: safeNum(goalDraft.target),
+        current: safeNum(goalDraft.current),
+        monthly: safeNum(goalDraft.monthly),
+        endDate: goalDraft.endDate,
+      },
+      ...arr,
+    ]);
+    setGoalDraft({ name: "", category: "Emergency", target: "", current: "", monthly: "", endDate: "" });
+  }
+  function updateGoal(id, patch) {
+    setGoals((arr) => arr.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  }
+  function removeGoal(id) {
+    setGoals((arr) => arr.filter((g) => g.id !== id));
+  }
+
+  function moveGoal(fromId, toId) {
+    setGoals((arr) => {
+      const from = arr.findIndex((x) => x.id === fromId);
+      const to = arr.findIndex((x) => x.id === toId);
+      if (from < 0 || to < 0 || from === to) return arr;
+      const next = [...arr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  // Mutators: assets/liabilities
+  function addAsset() {
+    const name = assetDraft.name.trim();
+    if (!name) return;
+    setAssets((arr) => [{ id: uid(), name, type: assetDraft.type, value: safeNum(assetDraft.value) }, ...arr]);
+    setAssetDraft({ name: "", value: "", type: "Investment" });
+  }
+  function updateAsset(id, key, value) {
+    setAssets((arr) => arr.map((a) => (a.id === id ? { ...a, [key]: value } : a)));
+  }
+  function removeAsset(id) {
+    setAssets((arr) => arr.filter((a) => a.id !== id));
+  }
+
+  function addLiability() {
+    const name = liabDraft.name.trim();
+    if (!name) return;
+    setLiabilities((arr) => [{ id: uid(), name, balance: safeNum(liabDraft.balance) }, ...arr]);
+    setLiabDraft({ name: "", balance: "" });
+  }
+  function updateLiability(id, key, value) {
+    setLiabilities((arr) => arr.map((l) => (l.id === id ? { ...l, [key]: value } : l)));
+  }
+  function removeLiability(id) {
+    setLiabilities((arr) => arr.filter((l) => l.id !== id));
+  }
+
+  const showOnboarding = !onboardingDone;
+  function finishOnboarding() {
+    setOnboardingDone(true);
+    setOnboardingStep(1);
+  }
+
+  function TabButton({ id, label, Icon }) {
+    const active = activeTab === id;
+    return (
+      <button
+        type="button"
+        className={"tab " + (active ? "active" : "")}
+        onClick={() => setActiveTab(id)}
+      >
+        <Icon size={16} />
+        <span className="tab-label">{label}</span>
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="header">
+        <div className="header-inner">
+          <div className="header-toprow">
+            <button className="btn outline" onClick={() => setDrawerOpen(true)} aria-label="Open menu">
+              <Menu size={16} />
+            </button>
+            <button type="button" className="brand" onClick={() => setActiveTab("home")} aria-label="Go to Home">Ikigai</button>
+            <button
+              className="btn outline"
+              onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              aria-label="Toggle theme"
+              title="Toggle theme"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
+{!["home","ikigai","goals","networth","retirement","about"].includes(activeTab) ? (
+  <div className="card">
+    <div className="card-body">
+      <h2 className="h1">Lost in navigation</h2>
+      <p className="sub">Resetting you back to Home.</p>
+      <button className="btn primary" onClick={() => setActiveTab("home")}>Go to Home</button>
+    </div>
+  </div>
+) : null}
+          <div className="nav" role="navigation" aria-label="Primary">
+            <TabButton id="home" label="Home" Icon={HomeIcon} />
+            <TabButton id="ikigai" label="Your Ikigai" Icon={Wallet} />
+            <TabButton id="goals" label="Savings" Icon={PiggyBank} />
+            <TabButton id="networth" label="Net Worth" Icon={LineChartIcon} />
+            <TabButton id="retirement" label="Retirement" Icon={BarChart3} />
+          </div>
+        </div>
+      </div>
+
+      {/* Drawer */}
+      {drawerOpen ? (
+        <>
+          <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
+          <div className="drawer" role="dialog" aria-label="Menu">
+            <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontWeight: 850, color: "var(--text)" }}>Ikigai</div>
+              <button className="btn outline" onClick={() => setDrawerOpen(false)} aria-label="Close menu">Close</button>
+            </div>
+
+            <div className="drawer-section">
+              <h3 style={{ margin: "8px 0" }}>Navigate</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button className="btn outline" onClick={() => (setActiveTab("home"), setDrawerOpen(false))}>Home</button>
+                <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Your Ikigai</button>
+                <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings</button>
+                <button className="btn outline" onClick={() => (setActiveTab("networth"), setDrawerOpen(false))}>Net Worth</button>
+                <button className="btn outline" onClick={() => (setActiveTab("retirement"), setDrawerOpen(false))}>Retirement</button>
+                <button className="btn outline" onClick={() => (setActiveTab("about"), setDrawerOpen(false))}>About</button>
+              </div>
+            </div>
+
+            <div className="drawer-section" style={{ marginTop: "auto" }}>
+              <h3 style={{ margin: "8px 0" }}>Appearance</h3>
+              <button className="btn outline" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
+                {theme === "dark" ? "Light mode" : "Dark mode"}
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <div className="container">
+        {/* HOME */}
+        {activeTab === "home" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* ... everything below unchanged from your version ... */}
+              {/* (kept identical to minimize risk) */}
+
+              {showOnboarding ? (
+                <div style={{ maxWidth: 760 }}>
+                  <div className="row" style={{ alignItems: "flex-start" }}>
+                    <div style={{ flex: 1 }}>
+                      <h2 className="h1">Home</h2>
+                      <p className="sub">Everyone’s life has tradeoffs. Let’s start with where you are right now.</p>
+                    </div>
+                    <button className="btn" onClick={finishOnboarding}>Skip for now</button>
+                  </div>
+
+                  <div className="note" style={{ marginTop: 12 }}>
+                    {/* Step 1 */}
+                    {onboardingStep === 1 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div>
+                          <div className="kicker">Step 1 of 4</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>You</div>
+                        </div>
+
+                        <div className="grid-2">
+                          <div className="field">
+                            <div className="label">Age</div>
+                            <input className="input" value={profile.age} onChange={(e) => setProfile({ ...profile, age: e.target.value })} />
+                          </div>
+                          <div className="field">
+                            <div className="label">Location</div>
+                            <input className="input" value={profile.location} placeholder="Los Angeles, CA, USA" onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
+                          </div>
+
+                          <div className="field">
+                            <div className="label">Relationship</div>
+                            <select value={profile.relationship} onChange={(e) => setProfile({ ...profile, relationship: e.target.value })}>
+                              <option value="">Select</option>
+                              <option>Single</option>
+                              <option>Partnered</option>
+                              <option>Married</option>
+                            </select>
+                          </div>
+
+                          <div className="grid-2" style={{ gap: 10 }}>
+                            <div className="field">
+                              <div className="label">Kids</div>
+                              <input
+                                className="input"
+                                inputMode="numeric"
+                                value={profile.kids}
+                                onChange={(e) => setProfile({ ...profile, kids: e.target.value })}
+                              />
+                            </div>
+                            <div className="field">
+                              <div className="label">Pets</div>
+                              <input
+                                className="input"
+                                inputMode="numeric"
+                                value={profile.pets}
+                                onChange={(e) => setProfile({ ...profile, pets: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                          <Tip text="Your stage of life shapes what ‘enough’ looks like. Nothing here is permanent." />
+                          <button className="btn primary" onClick={() => setOnboardingStep(2)}>Continue</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 2 */}
+                    {onboardingStep === 2 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div>
+                          <div className="kicker">Step 2 of 4</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>What supports your life</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>
+                            Add your income sources (monthly take-home).
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {profile.incomeSources.map((src) => (
+                            <div key={src.id} className="grid-2" style={{ gap: 10 }}>
+                              <div className="field">
+                                <div className="label">Source</div>
+                                <input className="input" value={src.name} onChange={(e) => setIncomeSource(src.id, { name: e.target.value })} />
+                              </div>
+                              <div className="row" style={{ alignItems: "flex-end" }}>
+                                <div className="field" style={{ flex: 1 }}>
+                                  <div className="label">Monthly</div>
+                                  <input
+                                    className="input"
+                                    inputMode="decimal"
+                                    value={src.monthly}
+                                    placeholder="e.g., 6500"
+                                    onChange={(e) => setIncomeSource(src.id, { monthly: e.target.value })}
+                                  />
+                                </div>
+                                {profile.incomeSources.length > 1 ? (
+                                  <button className="btn ghost" onClick={() => removeIncomeSource(src.id)} title="Remove">
+                                    <Trash2 size={16} />
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+
+                          <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                            <button className="btn" onClick={() => addIncomeSource("Other income")}><Plus size={16} /> Add income source</button>
+                            <div className="small">
+                              Total monthly: <b>{formatMoney(totalIncomeMonthly)}</b>
+                            </div>
+                          </div>
+
+                          <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+                            {["Dividend income", "Interest income", "Side hustle", "Bonus", "Rental income"].map((n) => (
+                              <button key={n} className="btn" onClick={() => addIncomeSource(n)}>
+                                + {n}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="small muted">This doesn’t need to be perfect. You can refine it anytime.</div>
+                        </div>
+
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                          <button className="btn" onClick={() => setOnboardingStep(1)}>Back</button>
+                          <button className="btn primary" onClick={() => setOnboardingStep(3)}>Continue</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 3 */}
+                    {onboardingStep === 3 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div>
+                          <div className="kicker">Step 3 of 4</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>What matters today</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>Start with a few things that feel important.</div>
+                        </div>
+
+                        <div className="grid-2">
+                          {["Housing", "Food & Drink", "Car / Transportation", "Pet"].map((c) => (
+                            <button
+                              key={c}
+                              className="tile"
+                              onClick={() => {
+                                setActiveTab("ikigai");
+                                setQuickDraft((d) => ({ ...d, category: c }));
+                              }}
+                              style={{ textAlign: "left", cursor: "pointer" }}
+                            >
+                              <div style={{ fontWeight: 850 }}>{c}</div>
+                              <div className="small muted" style={{ marginTop: 6 }}>Tap to add</div>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                          <button className="btn" onClick={() => setOnboardingStep(2)}>Back</button>
+                          <button className="btn primary" onClick={() => setOnboardingStep(4)}>Continue</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 4 */}
+                    {onboardingStep === 4 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        <div>
+                          <div className="kicker">Step 4 of 4</div>
+                          <div style={{ fontWeight: 850, fontSize: 18 }}>Looking ahead</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>Some parts of life are worth planning for.</div>
+                        </div>
+
+                        <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+                          <button
+                            className="btn primary"
+                            onClick={() => {
+                              setActiveTab("goals");
+                              finishOnboarding();
+                            }}
+                          >
+                            Add a savings goal
+                          </button>
+                          <button className="btn" onClick={finishOnboarding}>Skip for now</button>
+                        </div>
+
+                        <div className="row small muted" style={{ alignItems: "center", gap: 10 }}>
+                          <Tip text="Planning doesn’t mean committing — it means seeing." />
+                          <span>Planning doesn’t mean committing — it means seeing.</span>
+                        </div>
+
+                        <div className="note">
+                          <div style={{ fontWeight: 850 }}>Your Ikigai is taking shape.</div>
+                          <div className="small muted" style={{ marginTop: 4 }}>You can change any of this as life changes.</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+                    <div style={{ flex: 1 }}>
+                      <h2 className="h1">Home</h2>
+                      <p className="sub">A calm snapshot of your life right now.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setEditingBasics((v) => !v)}
+                    >
+                      Edit basics
+                    </button>
+                  </div>
+
+
+                  {editingBasics ? (
+                    <div className="note" style={{ marginTop: 12 }}>
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ fontWeight: 850 }}>Edit basics</div>
+                        <button type="button" className="btn outline" onClick={() => setEditingBasics(false)}>Done</button>
+                      </div>
+
+                      <div className="grid-2" style={{ marginTop: 12 }}>
+                        <div className="field">
+                          <div className="label">Age</div>
+                          <input className="input" value={profile.age} onChange={(e) => setProfile({ ...profile, age: e.target.value })} />
+                        </div>
+                        <div className="field">
+                          <div className="label">Location</div>
+                          <input className="input" value={profile.location} placeholder="Los Angeles, CA, USA" onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
+                        </div>
+
+                        <div className="field">
+                          <div className="label">Relationship</div>
+                          <select value={profile.relationship} onChange={(e) => setProfile({ ...profile, relationship: e.target.value })}>
+                            <option value="">Select</option>
+                            <option>Single</option>
+                            <option>Partnered</option>
+                            <option>Married</option>
+                          </select>
+                        </div>
+
+                        <div className="grid-2" style={{ gap: 10 }}>
+                          <div className="field">
+                            <div className="label">Kids</div>
+                            <input className="input" inputMode="numeric" value={profile.kids} onChange={(e) => setProfile({ ...profile, kids: e.target.value })} />
+                          </div>
+                          <div className="field">
+                            <div className="label">Pets</div>
+                            <input className="input" inputMode="numeric" value={profile.pets} onChange={(e) => setProfile({ ...profile, pets: e.target.value })} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="divider" style={{ marginTop: 14 }} />
+
+                      <div style={{ fontWeight: 750, marginTop: 10 }}>Income sources (monthly take-home)</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                        {profile.incomeSources.map((src) => (
+                          <div key={src.id} className="grid-2" style={{ gap: 10 }}>
+                            <div className="field">
+                              <div className="label">Source</div>
+                              <input className="input" value={src.name} onChange={(e) => setIncomeSource(src.id, { name: e.target.value })} />
+                            </div>
+                            <div className="row" style={{ alignItems: "flex-end" }}>
+                              <div className="field" style={{ flex: 1 }}>
+                                <div className="label">Monthly</div>
+                                <input
+                                  className="input"
+                                  inputMode="decimal"
+                                  value={src.monthly}
+                                  placeholder="e.g., 6500"
+                                  onChange={(e) => setIncomeSource(src.id, { monthly: e.target.value })}
+                                />
+                              </div>
+                              {profile.incomeSources.length > 1 ? (
+                                <button type="button" className="btn ghost" onClick={() => removeIncomeSource(src.id)} title="Remove">
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                          <button type="button" className="btn" onClick={() => addIncomeSource("Other income")}><Plus size={16} /> Add income source</button>
+                          <div className="small">
+                            Total monthly: <b>{formatMoney(totalIncomeMonthly)}</b>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="grid-4">
+                    <div className="tile">
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="label">Spending</div>
+                        <Tip text="Tap the number to switch Monthly ↔ Annual." />
+                      </div>
+                      <div
+                        className="big-number"
+                        onClick={() => setSpendingView((v) => (v === "monthly" ? "annual" : "monthly"))}
+                        title="Toggle monthly/annual"
+                      >
+                        {formatMoney(monthlySpendForSummary)}
+                        <small>
+                          {spendingView === "monthly" ? "Monthly" : "Annual"} <ChevronDown size={12} />
+                        </small>
+                      </div>
+                    </div>
+
+                    <div className="tile">
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="label">Savings rate</div>
+                        <Tip text="Savings rate = (Income − Spending) ÷ Income." />
+                      </div>
+                      <div className="big-number" style={{ cursor: "default" }}>{formatPct(savingsRate, 2)}</div>
+                    </div>
+
+                    <div className="tile">
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="label">Leftover money</div>
+                        <Tip text="Formula: monthly income − monthly spending." />
+                      </div>
+                      <div className="big-number" style={{ cursor: "default" }}>{formatMoney(leftoverMonthly)}</div>
+                    </div>
+
+                    <div className="tile">
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="label">Retirement target</div>
+                        <Tip text={`Assumes withdrawal rate ${(swr * 100).toFixed(2)}%. Toggle whether to include temporary spending.`} />
+                      </div>
+
+                      <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className={"pill " + (retirementView === "ongoing" ? "active" : "")}
+                          onClick={() => setRetirementView("ongoing")}
+                        >
+                          Ongoing
+                        </button>
+                        <button
+                          type="button"
+                          className={"pill " + (retirementView === "all" ? "active" : "")}
+                          onClick={() => setRetirementView("all")}
+                        >
+                          Include Temporary
+                        </button>
+                      </div>
+
+                      <div className="big-number" style={{ cursor: "default", marginTop: 10 }}>
+                        {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
+                      </div>
+                    </div>
+                  </div>
+
+
+                  <div className="note" style={{ marginTop: 6 }}>
+                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 850 }}>Insights</div>
+                      <span className={"badge " + (savingsGrade.tone === "good" ? "good" : savingsGrade.tone === "warn" ? "warn" : "")}>
+                        {savingsGrade.label}
+                      </span>
+                    </div>
+
+                    <div className="insight-bar" style={{ marginTop: 10 }}>
+                      <div className="insight-bar-spent" style={{ width: `${Math.round(spentPct * 100)}%` }} />
+                      <div className="insight-bar-left" style={{ width: `${Math.round((1 - spentPct) * 100)}%` }} />
+                    </div>
+                    <div className="row small muted" style={{ justifyContent: "space-between", marginTop: 8 }}>
+                      <span>Spent: <b>{Math.round(spentPct * 100)}%</b></span>
+                      <span>Leftover: <b>{Math.round((1 - spentPct) * 100)}%</b></span>
+                    </div>
+
+                    <div className="grid-3" style={{ marginTop: 12 }}>
+                      <div className="tile">
+                        <div className="label">Top category</div>
+                        <div style={{ fontWeight: 850, marginTop: 6 }}>{topCategory ?? "—"}</div>
+                        <div className="small muted" style={{ marginTop: 6 }}>Highest monthly spend.</div>
+                      </div>
+
+                      <div className="tile">
+                        <div className="label">Retirement progress</div>
+                        <div style={{ fontWeight: 850, marginTop: 6 }}>{formatPct(retirementProgress, 0)}</div>
+                        <div className="small muted" style={{ marginTop: 6 }}>Net worth vs. your current target.</div>
+                      </div>
+
+                      <div className="tile">
+                        <div className="label">Next action</div>
+                        <div className="small muted" style={{ marginTop: 8 }}>
+                          {totalIncomeMonthly <= 0
+                            ? "Add an income source to unlock a real snapshot."
+                            : items.length === 0
+                              ? "Add your first expense item (so your savings rate is meaningful)."
+                              : goals.length === 0
+                                ? "Add a savings goal to see progress over time."
+                                : "Review your top category and decide if it still matches what matters."}
+                        </div>
+                        <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                          {totalIncomeMonthly <= 0 ? (
+                            <button type="button" className="btn" onClick={() => { setEditingBasics(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Edit income</button>
+                          ) : items.length === 0 ? (
+                            <button type="button" className="btn" onClick={() => setActiveTab("ikigai")}>Add expense</button>
+                          ) : goals.length === 0 ? (
+                            <button type="button" className="btn" onClick={() => setActiveTab("goals")}>Add goal</button>
+                          ) : (
+                            <button type="button" className="btn" onClick={() => setActiveTab("ikigai")}>Open Ikigai</button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {spendingByCategory.length > 0 ? (
+                      <div style={{ height: 220, marginTop: 14 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={spendingByCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85}>
+                              {spendingByCategory.map((row) => (
+                                <Cell key={row.name} fill={IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"} />
+                              ))}
+                            </Pie>
+                            <ReTooltip formatter={(v, _n, p) => {
+                              const val = Number(v);
+                              const pct = totalIncomeMonthly > 0 ? val / totalIncomeMonthly : 0;
+                              return [`${formatMoney(val)} (${formatPct(pct, 1)})`, p?.payload?.name];
+                            }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="note">
+                    <div className="small">
+                      You’re seeing what your life implies — and you get to decide what changes, if any.
+                    </div>
+                  </div>
+
+                  {/* P1: add summary charts here */}
+                </div>
+                            )}
+            </div>
+          </div>
+        )}
+
+        {/* BUILD YOUR IKIGAI */}
+        {activeTab === "ikigai" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <h2 className="h1">Your Ikigai</h2>
+                <p className="sub">Some parts of life are essential. Others bring meaning. Most are a mix.</p>
+              </div>
+
+            <div className="note">
+  {/* Header */}
+  <div
+    className="row"
+    style={{
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap",
+    }}
+  >
+    <div style={{ flex: 1, minWidth: 260 }}>
+      <div style={{ fontWeight: 850 }}>Quick Add</div>
+
+      {/* Toggle */}
+      <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className={"pill " + (!guidedAdd ? "active" : "")}
+          onClick={() => setGuidedAdd(false)}
+        >
+          Simple
+        </button>
+        <button
+          type="button"
+          className={"pill " + (guidedAdd ? "active" : "")}
+          onClick={() => setGuidedAdd(true)}
+        >
+          Guided
+        </button>
+      </div>
+
+      <div className="small muted" style={{ marginTop: 6 }}>
+        Add one item at a time. Everything updates instantly.
+      </div>
+    </div>
+
+    <Tip text="Examples: Groceries, Gas, Gym, Coffee, Rent, Pet food, Streaming." />
+  </div>
+
+  {/* ⬇️ THIS IS THE IMPORTANT PART ⬇️ */}
+  {guidedAdd ? (
+    /* GUIDED MODE */
+    <div className="note" style={{ marginTop: 12 }}>
+      <div className="kicker">Guided add • Step {guidedStep} of 4</div>
+
+      {guidedStep === 1 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Choose a category</div>
+          <select
+            value={quickDraft.category}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, category: e.target.value }))}
+          >
+            {IKIGAI_CATEGORIES.map((c) => (
+              <option key={c.name}>{c.name}</option>
+            ))}
+          </select>
+
+          <div className="small muted">
+            Examples:{" "}
+            {getCategoryExamples(quickDraft.category).map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                className="chip"
+                onClick={() => setQuickDraft((d) => ({ ...d, name: ex }))}
+                style={{ marginRight: 8, marginTop: 6 }}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+
+          <div className="row" style={{ justifyContent: "flex-end", marginTop: 6 }}>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(2)}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 2 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Name the expense</div>
+          <input
+            className="input"
+            value={quickDraft.name}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder={getCategoryPlaceholder(quickDraft.category)}
+          />
+          <div className="small muted">Pick one of the examples above, or type your own.</div>
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(1)}>
+              Back
+            </button>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(3)} disabled={!quickDraft.name.trim()}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 3 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Monthly cost</div>
+          <input
+            className="input"
+            inputMode="decimal"
+            value={quickDraft.monthly}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, monthly: e.target.value }))}
+            placeholder="e.g., 450"
+          />
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(2)}>
+              Back
+            </button>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(4)} disabled={!String(quickDraft.monthly).trim()}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 4 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Details</div>
+
+          <div className="grid-2" style={{ gap: 10 }}>
+            <div className="field">
+              <div className="label">Need / Want</div>
+              <select
+                value={quickDraft.needWant}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, needWant: e.target.value }))}
+              >
+                <option value="need">Need</option>
+                <option value="want">Want</option>
+              </select>
+            </div>
+
+            <label className="row small" style={{ alignItems: "center", gap: 8, marginTop: 24 }}>
+              <input
+                type="checkbox"
+                checked={quickDraft.temporary}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, temporary: e.target.checked }))}
+              />
+              Temporary
+            </label>
+          </div>
+
+          {quickDraft.temporary ? (
+            <div className="field">
+              <div className="label">Ends (optional)</div>
+              <input
+                className="input"
+                type="date"
+                value={quickDraft.endDate}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, endDate: e.target.value }))}
+              />
+            </div>
+          ) : null}
+
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(3)}>
+              Back
+            </button>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() => {
+                addQuickItem();
+                setGuidedStep(1);
+              }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  ) : (
+    /* SIMPLE MODE (YOUR EXISTING QUICK ADD FORM) */
+    <>
+      <div className="row" style={{ gap: 12, marginTop: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div className="small muted">Name</div>
+          <input
+            value={quickDraft.name}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, name: e.target.value })
+            }
+            placeholder="Groceries, Gas, Gym, Coffee"
+          />
+        </div>
+
+        <div style={{ minWidth: 160 }}>
+          <div className="small muted">Category</div>
+          <select
+            value={quickDraft.category}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, category: e.target.value })
+            }
+          >
+            {IKIGAI_CATEGORIES.map((c) => (
+<option key={c.name} value={c.name}>
+  {c.name}
+</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ minWidth: 140 }}>
+          <div className="small muted">Monthly</div>
+          <input
+            value={quickDraft.monthly}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, monthly: e.target.value })
+            }
+            placeholder="e.g. 450"
+          />
+        </div>
+      </div>
+
+      <div
+        className="row"
+        style={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 12,
+        }}
+      >
+        <div className="row" style={{ gap: 12 }}>
+          <select
+            value={quickDraft.needWant}
+            onChange={(e) =>
+              setQuickDraft({ ...quickDraft, needWant: e.target.value })
+            }
+          >
+            <option value="need">Need</option>
+            <option value="want">Want</option>
+          </select>
+
+          <label className="row small muted" style={{ gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={quickDraft.temporary}
+              onChange={(e) =>
+                setQuickDraft({
+                  ...quickDraft,
+                  temporary: e.target.checked,
+                })
+              }
+            />
+            Temporary
+          </label>
+        </div>
+
+        <button className="btn primary" onClick={addQuickItem}>
+          + Add
+        </button>
+      </div>
+    </>
+  )}
+            </div>
+
+              <div className="grid-2">
+                {/* Left: item list */}
+                <div>
+                  <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                      <Pill active={spendListView === "monthly"} label="Monthly" onClick={() => setSpendListView("monthly")} />
+                      <Pill active={spendListView === "annual"} label="Annual" onClick={() => setSpendListView("annual")} />
+                      
+                    <Tip text="This is a mirror, not a grade. You can change anything." />
+                    </div>
+                  </div>
+
+                  {categoryFilter ? (
+                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+                      <div className="small">
+                        Showing category: <b>{categoryFilter}</b>
+                      </div>
+                      <button className="btn" onClick={() => setCategoryFilter(null)}>Clear</button>
+                    </div>
+                  ) : null}
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                    {visibleItems.length === 0 ? (
+                      <div className="tile muted">No items yet. Add a few to bring your Ikigai to life.</div>
+                    ) : (
+                      visibleItems.map((it) => {
+                        const isExpanded = expandedItemId === it.id;
+                        const monthly = safeNum(it.monthly);
+                        return (
+                          <div
+                            key={it.id}
+                            className={"tile item-row " + (isExpanded ? "expanded " : "") + (dragItemId === it.id ? "dragging " : "") + (dragOverItemId === it.id ? "drop-target " : "")}
+                            draggable
+                            onDragStart={(e) => {
+                            setDragItemId(it.id);
+                            try {
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", String(it.id));
+                            } catch {}
+                          }}
+                          onDragEnd={() => { setDragItemId(null); setDragOverItemId(null); }}
+                          onDragEnter={() => setDragOverItemId(it.id)}
+                          onDragLeave={() => setDragOverItemId((cur) => (cur === it.id ? null : cur))}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => {
+                              if (dragItemId && dragItemId !== it.id) moveItem(dragItemId, it.id);
+                              setDragItemId(null);
+                            }}
+                          >
+                            <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                              <button
+                                type="button"
+                                className="item-main"
+                                onClick={() => setExpandedItemId(isExpanded ? null : it.id)}
+                                aria-expanded={isExpanded}
+                              >
+                                <div className="item-title">{it.name || "(Unnamed item)"}</div>
+                                <div className="small muted">
+                                  {it.category}
+                                  {it.temporary ? " • Temporary" : ""}
+                                </div>
+                              </button>
+
+                              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                                <div className="small muted">
+                                  <b>
+                                    {formatMoney(spendListView === "monthly" ? monthly : monthly * 12)}
+                                  </b>{" "}
+                                  <span className="muted">{spendListView === "monthly" ? "Monthly" : "Annual"}</span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className="btn ghost"
+                                  onClick={() =>
+                                    updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })
+                                  }
+                                  title="Toggle need/want"
+                                >
+                                  <NeedWantBadge value={it.needWant} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="btn xbtn"
+                                  onClick={() => removeItem(it.id)}
+                                  aria-label="Delete item"
+                                  title="Delete"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+
+                            {isExpanded ? (
+                              <div style={{ marginTop: 12 }}>
+                                <div className="grid-2" style={{ gap: 10 }}>
+                                  <div className="field">
+                                    <div className="label">Name</div>
+                                    <input
+                                      className="input"
+                                      value={it.name}
+                                      onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                                    />
+                                  </div>
+
+                                  <div className="grid-2" style={{ gap: 10 }}>
+                                    <div className="field">
+                                      <div className="label">Category</div>
+                                      <select
+                                        value={it.category}
+                                        onChange={(e) => updateItem(it.id, { category: e.target.value })}
+                                      >
+                                        {IKIGAI_CATEGORIES.map((c) => (
+                                          <option key={c.name}>{c.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="field">
+                                      <div className="label">Monthly</div>
+                                      <input
+                                        className="input"
+                                        inputMode="decimal"
+                                        value={String(it.monthly)}
+                                        onChange={(e) => updateItem(it.id, { monthly: e.target.value })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid-2" style={{ marginTop: 10 }}>
+                                  <div className="field">
+                                    <div className="label">Need / Want</div>
+                                    <select
+                                      value={it.needWant}
+                                      onChange={(e) => updateItem(it.id, { needWant: e.target.value })}
+                                    >
+                                      <option value="need">Need</option>
+                                      <option value="want">Want</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="row goal-add-row" style={{ alignItems: "flex-end", gap: 10 }}>
+                                    <label className="row small" style={{ alignItems: "center", gap: 8 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={!!it.temporary}
+                                        onChange={(e) => updateItem(it.id, { temporary: e.target.checked })}
+                                      />
+                                      Temporary
+                                    </label>
+
+                                    {it.temporary ? (
+                                      <div className="field" style={{ flex: 1 }}>
+                                        <div className="label">Ends (optional)</div>
+                                        <input
+                                          className="input"
+                                          type="date"
+                                          value={it.endDate || ""}
+                                          onChange={(e) => updateItem(it.id, { endDate: e.target.value })}
+                                        />
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: summary pie */}
+                <div className="tile">
+                  <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 850 }}>Summary</div>
+                      <div className="small muted" style={{ marginTop: 4 }}>A simple story of where your money goes.</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                    <Pill active={pieMode === "category"} label="By category" onClick={() => setPieMode("category")} />
+                    <Pill active={pieMode === "needwant"} label="Needs vs. Wants" onClick={() => setPieMode("needwant")} />
+                  </div>
+
+                  <div style={{ height: 260, marginTop: 10 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieMode === "category" ? spendingByCategory : spendingByNeedWant}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={55}
+                          outerRadius={90}
+                          onClick={(data) => {
+                            // Drill down only for category mode
+                            if (pieMode !== "category") return;
+                            if (data?.name) setCategoryFilter(data.name);
+                          }}
+                        >
+                          {(pieMode === "category" ? spendingByCategory : spendingByNeedWant).map((row) => (
+                            <Cell
+                              key={row.name}
+                              fill={
+                                pieMode === "category"
+                                  ? IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"
+                                  : row.name === "Need"
+                                    ? "rgba(47,127,111,0.78)"
+                                    : "rgba(58,159,191,0.78)"
+                              }
+                            />
+                          ))}
+                        </Pie>
+                        <ReTooltip formatter={(v) => `${formatMoney(Number(v))} (${pieTotal > 0 ? formatPct(Number(v) / pieTotal, 1) : "0%"})`} contentStyle={{ background: "rgba(15,23,42,0.92)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }} itemStyle={{ color: "rgba(255,255,255,0.92)" }} labelStyle={{ color: "rgba(255,255,255,0.72)" }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="small" style={{ marginTop: 6 }}>
+                    Monthly total: <b>{formatMoney(monthlyIkigaiAll)}</b>
+                  </div>
+
+                  {pieMode === "category" ? (
+                    <div className="small muted" style={{ marginTop: 8 }}>
+                      Tip: tap a slice to drill into that category.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SAVINGS GOALS */}
+        {activeTab === "goals" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                  <div>
+                    <h2 className="h1">Savings</h2>
+                    <p className="sub">Progress should feel clear: what you have now — and how your monthly saving changes the future.</p>
+                  </div>
+                  <Tip text="Solid = what you have now. Pattern = what your current $/mo can reach by your end date (or next 12 months)." />
+                </div>
+              </div>
+
+              <div className="note">
+                <div className="grid-2">
+                  <div className="field">
+                    <div className="label">Name</div>
+                    <input
+                      className="input"
+                      value={goalDraft.name}
+                      onChange={(e) => setGoalDraft((d) => ({ ...d, name: e.target.value }))}
+                      placeholder="Emergency fund"
+                    />
+                  </div>
+                  <div className="grid-2" style={{ gap: 10 }}>
+                    <div className="field">
+                      <div className="label">Category</div>
+                      <select value={goalDraft.category} onChange={(e) => setGoalDraft((d) => ({ ...d, category: e.target.value }))}>
+                        {GOAL_PRESETS.map((g) => <option key={g}>{g}</option>)}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <div className="label">Target</div>
+                      <input className="input" inputMode="decimal" value={goalDraft.target} onChange={(e) => setGoalDraft((d) => ({ ...d, target: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid-2" style={{ marginTop: 10 }}>
+                  <div className="grid-2" style={{ gap: 10 }}>
+                    <div className="field">
+                      <div className="label">Current</div>
+                      <input className="input" inputMode="decimal" value={goalDraft.current} onChange={(e) => setGoalDraft((d) => ({ ...d, current: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <div className="label">$ / month</div>
+                      <input className="input" inputMode="decimal" value={goalDraft.monthly} onChange={(e) => setGoalDraft((d) => ({ ...d, monthly: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
+                    <div className="field" style={{ flex: 1 }}>
+                      <div className="label">End date (optional)</div>
+                      <input className="input" type="date" value={goalDraft.endDate} onChange={(e) => setGoalDraft((d) => ({ ...d, endDate: e.target.value }))} />
+                    </div>
+                    <button className="btn primary" onClick={addGoal}><Plus size={16} /> Add goal</button>
+                  </div>
+                </div>
+
+                <div className="small muted" style={{ marginTop: 10 }}>
+                  Tip: setting an end date enables “on track” guidance. Without it, we preview the next 12 months.
+                </div>
+              </div>
+
+              {goals.length === 0 ? (
+                <div className="tile muted">No goals yet. Add one to see progress.</div>
+              ) : (
+                <div className="grid-3">
+                  {goals.map((g) => {
+                  const gp = goalProgress.find((x) => x.id === g.id);
+                  const monthsLeft =
+                    g.endDate && isValidDate(g.endDate)
+                      ? Math.max(0, monthsBetween(new Date(), new Date(g.endDate)))
+                      : null;
+
+                  const footerText =
+                    monthsLeft !== null
+                      ? `${monthsLeft} months left`
+                      : g.endDate && isValidDate(g.endDate)
+                      ? `End date: ${formatDate(g.endDate)}`
+                      : "Preview: next 12 months";
+
+                  return (
+                    <div
+                      key={g.id}
+                      className={
+                        "bucket-wrap" +
+                        (dragOverGoalId === g.id ? " drag-over" : "") +
+                        (dragGoalId === g.id ? " dragging" : "")
+                      }
+                      draggable
+                      onDragStart={() => setDragGoalId(g.id)}
+                      onDragEnd={() => {
+                        setDragGoalId(null);
+                        setDragOverGoalId(null);
+                      }}
+                      onDragEnter={() => setDragOverGoalId(g.id)}
+                      onDragLeave={() => setDragOverGoalId((cur) => (cur === g.id ? null : cur))}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (dragGoalId && dragGoalId !== g.id) moveGoal(dragGoalId, g.id);
+                        setDragGoalId(null);
+                      }}
+                    >
+                      <BucketTile
+                        title={g.name}
+                        subtitle={`Category: ${g.category}`}
+                        currentPct={gp?.pct ?? 0}
+                        projectedPct={gp?.projectedPct ?? 0}
+                        status={gp?.status ?? null}
+                        footer={footerText}
+                        onClick={() => setExpandedGoalId((id) => (id === g.id ? null : g.id))}
+                      />
+
+                      {expandedGoalId === g.id ? (
+                        <div className="note">
+                          <div className="grid-2" style={{ gap: 10 }}>
+                            <div className="field">
+                              <div className="label">Name</div>
+                              <input
+                                className="input"
+                                value={g.name}
+                                onChange={(e) => editGoal(g.id, { name: e.target.value })}
+                              />
+                            </div>
+                            <div className="field">
+                              <div className="label">Category</div>
+                              <select
+                                className="input"
+                                value={g.category}
+                                onChange={(e) => editGoal(g.id, { category: e.target.value })}
+                              >
+                                {GOAL_CATEGORIES.map((c) => (
+                                  <option key={c} value={c}>
+                                    {c}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="grid-2" style={{ gap: 10, marginTop: 10 }}>
+                            <div className="field">
+                              <div className="label">Target</div>
+                              <input
+                                className="input"
+                                inputMode="decimal"
+                                value={g.target}
+                                onChange={(e) => editGoal(g.id, { target: e.target.value })}
+                              />
+                            </div>
+                            <div className="field">
+                              <div className="label">Current</div>
+                              <input
+                                className="input"
+                                inputMode="decimal"
+                                value={g.current}
+                                onChange={(e) => editGoal(g.id, { current: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid-2" style={{ gap: 10, marginTop: 10 }}>
+                            <div className="field">
+                              <div className="label">Monthly</div>
+                              <input
+                                className="input"
+                                inputMode="decimal"
+                                value={g.monthly}
+                                onChange={(e) => editGoal(g.id, { monthly: e.target.value })}
+                              />
+                            </div>
+                            <div className="field">
+                              <div className="label">End Date (optional)</div>
+                              <input
+                                className="input"
+                                type="date"
+                                value={g.endDate}
+                                onChange={(e) => editGoal(g.id, { endDate: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="row" style={{ justifyContent: "flex-end", marginTop: 10 }}>
+                            <button className="btn outline" onClick={() => deleteGoal(g.id)}>
+                              × Delete
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* NET WORTH */}
+        {activeTab === "networth" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <h2 className="h1">Net Worth</h2>
+                <p className="sub">Add assets and liabilities—net worth updates automatically. (Account linking comes later.)</p>
+              </div>
+
+              <div className="grid-2">
+                <div className="note">
+                  <div style={{ fontWeight: 850 }}>Assets (includes investments)</div>
+                  <div className="divider" />
+                  <div className="grid-2" style={{ gap: 10 }}>
+                    <div className="field">
+                      <div className="label">Name</div>
+                      <input className="input" value={assetDraft.name} onChange={(e) => setAssetDraft({ ...assetDraft, name: e.target.value })} placeholder="Home, 401k, Brokerage" />
+                    </div>
+                    <div className="field">
+                      <div className="label">Value</div>
+                      <input className="input" inputMode="decimal" value={assetDraft.value} onChange={(e) => setAssetDraft({ ...assetDraft, value: e.target.value })} placeholder="e.g., 250000" />
+                    </div>
+                  </div>
+                  <div className="row" style={{ marginTop: 10, gap: 10 }}>
+                    <div className="field" style={{ flex: 1 }}>
+                      <div className="label">Type</div>
+                      <select value={assetDraft.type} onChange={(e) => setAssetDraft({ ...assetDraft, type: e.target.value })}>
+                        <option>Investment</option>
+                        <option>Real Estate</option>
+                        <option>Cash</option>
+                        <option>Vehicle</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
+                    <button className="btn primary" onClick={addAsset}><Plus size={16} /> Add</button>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                    {assets.length === 0 ? <div className="muted small">No assets yet.</div> : null}
+                    {assets.map((a) => (
+                      <div key={a.id} className="tile">
+                        <div className="grid-2" style={{ gap: 10 }}>
+                          <input className="input" value={a.name} onChange={(e) => updateAsset(a.id, "name", e.target.value)} />
+                          <div className="row" style={{ alignItems: "center", gap: 10 }}>
+                            <input className="input" inputMode="decimal" value={String(a.value)} onChange={(e) => updateAsset(a.id, "value", safeNum(e.target.value))} style={{ flex: 1 }} />
+                            <button className="btn ghost" onClick={() => removeAsset(a.id)} title="Remove"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                        <div className="small muted" style={{ marginTop: 6 }}>{a.type}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="note">
+                  <div style={{ fontWeight: 850 }}>Liabilities</div>
+                  <div className="divider" />
+                  <div className="grid-2" style={{ gap: 10 }}>
+                    <div className="field">
+                      <div className="label">Name</div>
+                      <input className="input" value={liabDraft.name} onChange={(e) => setLiabDraft({ ...liabDraft, name: e.target.value })} placeholder="Mortgage, Student loan" />
+                    </div>
+                    <div className="field">
+                      <div className="label">Balance</div>
+                      <input className="input" inputMode="decimal" value={liabDraft.balance} onChange={(e) => setLiabDraft({ ...liabDraft, balance: e.target.value })} placeholder="e.g., 180000" />
+                    </div>
+                  </div>
+                  <div className="row" style={{ marginTop: 10, justifyContent: "flex-end" }}>
+                    <button className="btn primary" onClick={addLiability}><Plus size={16} /> Add</button>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                    {liabilities.length === 0 ? <div className="muted small">No liabilities yet.</div> : null}
+                    {liabilities.map((l) => (
+                      <div key={l.id} className="tile">
+                        <div className="grid-2" style={{ gap: 10 }}>
+                          <input className="input" value={l.name} onChange={(e) => updateLiability(l.id, "name", e.target.value)} />
+                          <div className="row" style={{ alignItems: "center", gap: 10 }}>
+                            <input className="input" inputMode="decimal" value={String(l.balance)} onChange={(e) => updateLiability(l.id, "balance", safeNum(e.target.value))} style={{ flex: 1 }} />
+                            <button className="btn ghost" onClick={() => removeLiability(l.id)} title="Remove"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid-2">
+                <div className="tile">
+                  <div className="label">Assets</div>
+                  <div className="big-number" style={{ cursor: "default" }}>{formatMoney(totalAssets)}</div>
+                </div>
+                <div className="tile">
+                  <div className="label">Liabilities</div>
+                  <div className="big-number" style={{ cursor: "default" }}>{formatMoney(totalLiabilities)}</div>
+                </div>
+              </div>
+
+              <div className="tile">
+                <div className="label">Net worth</div>
+                <div className="big-number" style={{ cursor: "default", color: netWorth < 0 ? "#ef4444" : "#16a34a" }}>
+                  {formatMoney(netWorth)}
+                </div>
+              </div>
+
+              <div className="note">
+                <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontWeight: 850 }}>Net worth over time</div>
+                  <div className="small muted">(Auto snapshots monthly. Account linking comes later.)</div>
+                </div>
+                <div style={{ height: 260, marginTop: 10 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={netWorthHistory}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="t" />
+                      <YAxis tickFormatter={(v) => `$${Math.round(Number(v) / 1000)}k`} />
+                      <ReTooltip formatter={(v) => formatMoney(Number(v))} contentStyle={{ background: "rgba(15,23,42,0.92)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }} itemStyle={{ color: "rgba(255,255,255,0.92)" }} labelStyle={{ color: "rgba(255,255,255,0.72)" }} />
+                      <Line type="monotone" dataKey="value" strokeWidth={3} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RETIREMENT */}
+        {activeTab === "retirement" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <h2 className="h1">Retirement</h2>
+                <p className="sub">Sustain what matters — without needing perfection.</p>
+              </div>
+
+              <div className="note">
+                <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 850 }}>Retirement target</div>
+                    <div className="small muted" style={{ marginTop: 4 }}>Toggle whether to include temporary items.</div>
+                  </div>
+                  <Tip text="This is a simple, high-level target. We can add a timeline and inflation next." />
+                </div>
+
+                <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className={"pill " + (retirementView === "ongoing" ? "active" : "")}
+                    onClick={() => setRetirementView("ongoing")}
+                  >
+                    Ongoing
+                  </button>
+                  <button
+                    type="button"
+                    className={"pill " + (retirementView === "all" ? "active" : "")}
+                    onClick={() => setRetirementView("all")}
+                  >
+                    Include Temporary
+                  </button>
+                </div>
+
+                <div className="big-number" style={{ cursor: "default", marginTop: 10 }}>
+                  {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
+                </div>
+
+                <div className="grid-2" style={{ marginTop: 14 }}>
+                  <div className="field">
+                    <div className="label">Withdrawal rate</div>
+                    <div className="row" style={{ alignItems: "center", gap: 10 }}>
+                      <input
+                        type="range"
+                        className="range"
+                        min={2.5}
+                        max={6}
+                        step={0.25}
+                        value={swr * 100}
+                        onChange={(e) => setSwr(safeNum(e.target.value) / 100)}
+                        style={{ flex: 1 }}
+                      />
+                      <input
+                        className="input"
+                        style={{ width: 92 }}
+                        inputMode="decimal"
+                        value={swrText}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSwrText(v);
+                          const n = safeNum(v);
+                          if (Number.isFinite(n)) setSwr(n / 100);
+                        }}
+                        onBlur={() => setSwrText((swr * 100).toFixed(2))}
+                      />
+                      <span className="small muted">%</span>
+                    </div>
+                    <div className="small muted" style={{ marginTop: 8 }}>
+                      Most people explore ~3%–5%. Higher rates lower the target but increase risk.
+                    </div>
+                  </div>
+
+                  <div className="tile">
+                    <div className="small muted">Monthly spending (all)</div>
+                    <div style={{ fontWeight: 850, fontSize: 18, marginTop: 6 }}>{formatMoney(monthlyIkigaiAll)}</div>
+                    <div className="small muted" style={{ marginTop: 14 }}>Monthly spending (ongoing)</div>
+                    <div style={{ fontWeight: 850, fontSize: 18, marginTop: 6 }}>{formatMoney(monthlyIkigaiOngoing)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ABOUT */}
+        {activeTab === "about" && (
+          <div className="card">
+            <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 820 }}>
+              <h2 className="h1">About</h2>
+              <p className="sub">
+                Ikigai is often translated as “a reason for being” — what gets you up in the morning.
+              </p>
+
+              <div className="note">
+                <div style={{ fontWeight: 850, marginBottom: 6 }}>What Ikigai means in this app</div>
+                <div className="small">
+                  Financial planning is rarely just about money. It’s about funding what matters to you.
+                  Ikigai doesn’t tell people what to do. It shows them what their life implies — and lets them decide.
+                </div>
+              </div>
+
+              <div className="note">
+                <div style={{ fontWeight: 850, marginBottom: 6 }}>Tone and intent</div>
+                <div className="small">
+                  We aim for calm and reassuring — realistic but supportive. Life changes; budgets aren’t moral report cards.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* First-time only: finish onboarding button (when they’re done) */}
+        {!onboardingDone && activeTab !== "home" ? (
+          <div className="note" style={{ marginTop: 14 }}>
+            <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+              <div className="small muted">Still onboarding? You can finish anytime.</div>
+              <button className="btn" onClick={finishOnboarding}>Mark onboarding done</button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
+  );
+}
