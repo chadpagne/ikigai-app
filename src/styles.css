@@ -477,3 +477,19 @@ body.dark option {
   color: var(--text);
 }
 .input::placeholder { color: var(--muted); opacity: 0.75; }
+
+/* Drag + drop row cues */
+.tile.item-row.dragging, .tile.goal-row.dragging {
+  opacity: 0.95;
+  transform: scale(0.99);
+  box-shadow: none !important;
+}
+.tile.item-row.dragover, .tile.goal-row.dragover {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Better pill touch targets */
+.pill {
+  min-height: 34px;
+}

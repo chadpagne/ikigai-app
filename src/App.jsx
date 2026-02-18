@@ -33,7 +33,7 @@ import {
  * - Vite + React
  * - localStorage persistence
  * - Guided onboarding (first time only)
- * - Tabs: Home, Build Your Ikigai, Savings Goals, Net Worth, Retirement, About
+ * - Tabs: Home, Build Your Ikigai, Savings, Net Worth, Retirement, About
  * - Dark mode fixed for tiles + nav text (CSS patch below)
  * - Mobile tooltip clamped to viewport (fixed here)
  * - Pie drill-down by category
@@ -44,7 +44,12 @@ const BRAND_BLUE = "#3a9fbf";
 
 // Helpers
 function uid() {
-  return crypto?.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+  // Optional chaining doesn't protect against an *undeclared* global.
+  // In some environments, referencing `crypto` can throw and blank the whole app.
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return String(Date.now() + Math.random());
 }
 function safeNum(v) {
   if (v === null || v === undefined) return 0;
@@ -56,6 +61,15 @@ function safeNum(v) {
 function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
+
+function savingsGrade(rate) {
+  if (!isFinite(rate)) return { label: "—", tone: "muted" };
+  if (rate < 0.10) return { label: "Needs Improvement", tone: "warn" };
+  if (rate < 0.20) return { label: "Ok", tone: "mid" };
+  if (rate < 0.30) return { label: "Good", tone: "good" };
+  return { label: "Great", tone: "good" };
+}
+
 function formatMoney(n) {
   const abs = Math.abs(n);
   if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
@@ -350,12 +364,17 @@ export default function App() {
   const [liabDraft, setLiabDraft] = useState({ name: "", balance: "" });
   const [netWorthHistory, setNetWorthHistory] = useState([]);
 
-  const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
+  const [spendingView, setSpendingView] = useState("monthly");
+  const [rowMoneyMode, setRowMoneyMode] = useState("monthly"); // affects list row display
+ // monthly | annual
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
 
   const [pieMode, setPieMode] = useState("category"); // category | needwant
   const [categoryFilter, setCategoryFilter] = useState(null);
+  const [expandedItemId, setExpandedItemId] = useState(null);
+  const [dragItemId, setDragItemId] = useState(null);
+  const [dragGoalId, setDragGoalId] = useState(null);
   const [expandedGoalId, setExpandedGoalId] = useState(null);
 
   // Theme apply
@@ -572,6 +591,18 @@ useEffect(() => {
     setItems((arr) => arr.filter((x) => x.id !== id));
   }
 
+  function moveItem(fromId, toId) {
+    setItems((arr) => {
+      const from = arr.findIndex((x) => x.id === fromId);
+      const to = arr.findIndex((x) => x.id === toId);
+      if (from < 0 || to < 0 || from === to) return arr;
+      const next = [...arr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
   // Mutators: goals
   function addGoal() {
     const name = goalDraft.name.trim();
@@ -595,6 +626,18 @@ useEffect(() => {
   }
   function removeGoal(id) {
     setGoals((arr) => arr.filter((g) => g.id !== id));
+  }
+
+  function moveGoal(fromId, toId) {
+    setGoals((arr) => {
+      const from = arr.findIndex((x) => x.id === fromId);
+      const to = arr.findIndex((x) => x.id === toId);
+      if (from < 0 || to < 0 || from === to) return arr;
+      const next = [...arr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   }
 
   // Mutators: assets/liabilities
@@ -675,7 +718,7 @@ useEffect(() => {
           <div className="nav" role="navigation" aria-label="Primary">
             <TabButton id="home" label="Home" Icon={HomeIcon} />
             <TabButton id="ikigai" label="Build Your Ikigai" Icon={Wallet} />
-            <TabButton id="goals" label="Savings Goals" Icon={PiggyBank} />
+            <TabButton id="goals" label="Savings" Icon={PiggyBank} />
             <TabButton id="networth" label="Net Worth" Icon={LineChartIcon} />
             <TabButton id="retirement" label="Retirement" Icon={BarChart3} />
           </div>
@@ -697,7 +740,7 @@ useEffect(() => {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button className="btn outline" onClick={() => (setActiveTab("home"), setDrawerOpen(false))}>Home</button>
                 <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Build Your Ikigai</button>
-                <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings Goals</button>
+                <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings</button>
                 <button className="btn outline" onClick={() => (setActiveTab("networth"), setDrawerOpen(false))}>Net Worth</button>
                 <button className="btn outline" onClick={() => (setActiveTab("retirement"), setDrawerOpen(false))}>Retirement</button>
                 <button className="btn outline" onClick={() => (setActiveTab("about"), setDrawerOpen(false))}>About</button>
@@ -766,7 +809,7 @@ useEffect(() => {
                               <div className="label">Kids</div>
                               <input
                                 className="input"
-                                inputMode="numeric"
+                                inputMode="decimal"
                                 value={profile.kids}
                                 onChange={(e) => setProfile({ ...profile, kids: e.target.value })}
                               />
@@ -775,7 +818,7 @@ useEffect(() => {
                               <div className="label">Pets</div>
                               <input
                                 className="input"
-                                inputMode="numeric"
+                                inputMode="decimal"
                                 value={profile.pets}
                                 onChange={(e) => setProfile({ ...profile, pets: e.target.value })}
                               />
@@ -1159,10 +1202,33 @@ useEffect(() => {
               <div className="grid-2">
                 {/* Left: item list */}
                 <div>
-                  <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                  <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                    <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                      <div className="small muted" style={{ marginRight: 6 }}>Rows:</div>
+                      <button
+                        type="button"
+                        className={"pill " + (rowMoneyMode === 'monthly' ? 'active' : '')}
+                        onClick={() => setRowMoneyMode('monthly')}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        className={"pill " + (rowMoneyMode === 'annual' ? 'active' : '')}
+                        onClick={() => setRowMoneyMode('annual')}
+                      >
+                        Annual
+                      </button>
+                    </div>
+                  <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <div className="row" style={{ gap: 6, alignItems: "center" }}>
+                      <button type="button" className={"pill " + (spendingView === "monthly" ? "active" : "")} onClick={() => setSpendingView("monthly")}>Monthly</button>
+                      <button type="button" className={"pill " + (spendingView === "annual" ? "active" : "")} onClick={() => setSpendingView("annual")}>Annual</button>
+                    </div>
                     <Tip text="This is a mirror, not a grade. You can change anything." />
                   </div>
+                </div>
 
                   {categoryFilter ? (
                     <div className="row" style={{ alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
@@ -1177,66 +1243,142 @@ useEffect(() => {
                     {visibleItems.length === 0 ? (
                       <div className="tile muted">No items yet. Add a few to bring your Ikigai to life.</div>
                     ) : (
-                      visibleItems.map((it) => (
-                        <div key={it.id} className="tile">
-                          <div className="grid-2" style={{ gap: 10 }}>
-                            <div>
-                              <input
-                                className="input"
-                                value={it.name}
-                                onChange={(e) => updateItem(it.id, { name: e.target.value })}
-                              />
-                              <div
-                                className="row small muted"
-                                style={{ marginTop: 6, gap: 10, flexWrap: "wrap", alignItems: "center" }}
-                              >
-                                <span>Category:</span>
-                                <select
-                                  value={it.category}
-                                  onChange={(e) => updateItem(it.id, { category: e.target.value })}
-                                  style={{ maxWidth: 240 }}
-                                >
-                                  {IKIGAI_CATEGORIES.map((c) => (
-                                    <option key={c.name} value={c.name}>
-                                      {c.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                {it.temporary ? <span className="badge warn">Temporary</span> : null}
-                              </div>
-                            </div>
-
-                            <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
-                              <div className="field" style={{ flex: 1 }}>
-                                <div className="label">Monthly</div>
-                                <input
-                                  className="input"
-                                  inputMode="decimal"
-                                  value={it.monthly ?? ""}
-                                  onChange={(e) => updateItem(it.id, { monthly: e.target.value })}
-                                />
-                              </div>
-
+                      visibleItems.map((it) => {
+                        const isExpanded = expandedItemId === it.id;
+                        const monthly = safeNum(it.monthly);
+                        return (
+                          <div
+                            key={it.id}
+                            className={"tile item-row " + (isExpanded ? "expanded" : "")}
+                            draggable
+                            onDragStart={() => setDragItemId(it.id)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => {
+                              if (dragItemId && dragItemId !== it.id) moveItem(dragItemId, it.id);
+                              setDragItemId(null);
+                            }}
+                          >
+                            <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                               <button
-                                className="btn ghost"
-                                onClick={() => updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })}
-                                title="Toggle need/want"
+                                type="button"
+                                className="item-main"
+                                onClick={() => setExpandedItemId(isExpanded ? null : it.id)}
+                                aria-expanded={isExpanded}
                               >
-                                <NeedWantBadge value={it.needWant} />
+                                <div className="item-title">{it.name || "(Unnamed item)"}</div>
+                                <div className="small muted">
+                                  {it.category}
+                                  {it.temporary ? " • Temporary" : ""}
+                                </div>
                               </button>
 
-                              <button className="btn ghost" onClick={() => removeItem(it.id)} title="Remove">
-                                <Trash2 size={16} />
-                              </button>
+                              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                                <div className="small muted" title="Monthly / Annual">
+                                  <b>{formatMoney(monthly)}</b>{" "}
+                                  <span className="muted">/ {formatMoney(monthly * 12)}</span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className="btn ghost"
+                                  onClick={() =>
+                                    updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })
+                                  }
+                                  title="Toggle need/want"
+                                >
+                                  <NeedWantBadge value={it.needWant} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="btn xbtn"
+                                  onClick={() => removeItem(it.id)}
+                                  aria-label="Delete item"
+                                  title="Delete"
+                                >
+                                  ×
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
 
-                {/* Right: summary pie */}
+                            {isExpanded ? (
+                              <div style={{ marginTop: 12 }}>
+                                <div className="grid-2" style={{ gap: 10 }}>
+                                  <div className="field">
+                                    <div className="label">Name</div>
+                                    <input
+                                      className="input"
+                                      value={it.name}
+                                      onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                                    />
+                                  </div>
+
+                                  <div className="grid-2" style={{ gap: 10 }}>
+                                    <div className="field">
+                                      <div className="label">Category</div>
+                                      <select
+                                        value={it.category}
+                                        onChange={(e) => updateItem(it.id, { category: e.target.value })}
+                                      >
+                                        {IKIGAI_CATEGORIES.map((c) => (
+                                          <option key={c.name}>{c.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="field">
+                                      <div className="label">Monthly</div>
+                                      <input
+                                        className="input"
+                                        inputMode="decimal"
+                                        value={String(it.monthly)}
+                                        onChange={(e) => updateItem(it.id, { monthly: e.target.value })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid-2" style={{ marginTop: 10 }}>
+                                  <div className="field">
+                                    <div className="label">Need / Want</div>
+                                    <select
+                                      value={it.needWant}
+                                      onChange={(e) => updateItem(it.id, { needWant: e.target.value })}
+                                    >
+                                      <option value="need">Need</option>
+                                      <option value="want">Want</option>
+                                    </select>
+                                  </div>
+
+                                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
+                                    <label className="row small" style={{ alignItems: "center", gap: 8 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={!!it.temporary}
+                                        onChange={(e) => updateItem(it.id, { temporary: e.target.checked })}
+                                      />
+                                      Temporary
+                                    </label>
+
+                                    {it.temporary ? (
+                                      <div className="field" style={{ flex: 1 }}>
+                                        <div className="label">Ends (optional)</div>
+                                        <input
+                                          className="input"
+                                          type="date"
+                                          value={it.endDate || ""}
+                                          onChange={(e) => updateItem(it.id, { endDate: e.target.value })}
+                                        />
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    )}                {/* Right: summary pie */}
                 <div className="tile">
                   <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
                     <div style={{ flex: 1 }}>
@@ -1305,7 +1447,7 @@ useEffect(() => {
               <div>
                 <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                   <div>
-                    <h2 className="h1">Savings Goals</h2>
+                    <h2 className="h1">Savings</h2>
                     <p className="sub">Progress should feel clear: what you have now — and how your monthly saving changes the future.</p>
                   </div>
                   <Tip text="Solid = what you have now. Pattern = what your current $/mo can reach by your end date (or next 12 months)." />
@@ -1382,7 +1524,18 @@ useEffect(() => {
                     };
 
                     return (
-  <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  <div
+                        key={g.id}
+                        className="goal-wrap"
+                        style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                        draggable
+                        onDragStart={() => setDragGoalId(g.id)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (dragGoalId && dragGoalId !== g.id) moveGoal(dragGoalId, g.id);
+                          setDragGoalId(null);
+                        }}
+                      >
     <BucketTile
       title={g.name}
       subtitle={`Category: ${g.category}`}
@@ -1454,11 +1607,12 @@ useEffect(() => {
           style={{ marginTop: 10, justifyContent: "flex-end" }}
         >
           <button
-            className="btn"
+            className="btn xbtn"
             onClick={() => removeGoal(g.id)}
-            title="Remove"
+            title="Delete"
+            aria-label="Delete goal"
           >
-            <Trash2 size={16} /> Remove
+            ×
           </button>
         </div>
       </div>
