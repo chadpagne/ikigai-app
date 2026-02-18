@@ -345,6 +345,7 @@ export default function App() {
 
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [onboardingDone, setOnboardingDone] = useState(false);
+  const [editingBasics, setEditingBasics] = useState(false);
 
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
 
@@ -382,6 +383,7 @@ export default function App() {
   const [goalListView, setGoalListView] = useState("monthly"); // monthly | annual (list rows)
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
+  const [swrText, setSwrText] = useState(() => (0.04 * 100).toFixed(2));
 
   const [pieMode, setPieMode] = useState("category"); // category | needwant
   const [categoryFilter, setCategoryFilter] = useState(null);
@@ -397,6 +399,11 @@ export default function App() {
     localStorage.setItem("ikigai_theme", theme);
     document.body.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  // Keep SWR text in sync with slider / state (helps mobile editing feel responsive)
+  useEffect(() => {
+    setSwrText((swr * 100).toString());
+  }, [swr]);
 
 // Hash routing (safe)
 const VALID_TABS = useMemo(
@@ -479,6 +486,28 @@ useEffect(() => {
     if (totalIncomeMonthly <= 0) return 0;
     return clamp01(leftoverMonthly / totalIncomeMonthly);
   }, [leftoverMonthly, totalIncomeMonthly]);
+  const savingsGrade = useMemo(() => {
+    // Heuristic: simple, non-judgy labels. Based on leftover/income.
+    if (totalIncomeMonthly <= 0) return { label: "Add income", tone: "muted" };
+    const r = savingsRate;
+    if (r < 0.05) return { label: "Needs improvement", tone: "warn" };
+    if (r < 0.10) return { label: "OK", tone: "neutral" };
+    if (r < 0.20) return { label: "Good", tone: "good" };
+    return { label: "Great", tone: "good" };
+  }, [savingsRate, totalIncomeMonthly]);
+
+  const spentPct = useMemo(() => {
+    if (totalIncomeMonthly <= 0) return 0;
+    return clamp01(monthlyIkigaiAll / totalIncomeMonthly);
+  }, [monthlyIkigaiAll, totalIncomeMonthly]);
+
+  const retirementProgress = useMemo(() => {
+    const target = retirementView === "all" ? retirementTargetAll : retirementTargetOngoing;
+    if (target <= 0) return 0;
+    return clamp01(netWorth / target);
+  }, [netWorth, retirementTargetAll, retirementTargetOngoing, retirementView]);
+
+  const topCategory = useMemo(() => spendingByCategory[0]?.name ?? null, [spendingByCategory]);
 
   const retirementTargetOngoing = useMemo(() => {
     const annual = monthlyIkigaiOngoing * 12;
@@ -989,11 +1018,91 @@ useEffect(() => {
                     <button
                       type="button"
                       className="btn"
-                      onClick={() => { setOnboardingDone(false); setOnboardingStep(1); }}
+                      onClick={() => setEditingBasics((v) => !v)}
                     >
                       Edit basics
                     </button>
                   </div>
+
+
+                  {editingBasics ? (
+                    <div className="note" style={{ marginTop: 12 }}>
+                      <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ fontWeight: 850 }}>Edit basics</div>
+                        <button type="button" className="btn outline" onClick={() => setEditingBasics(false)}>Done</button>
+                      </div>
+
+                      <div className="grid-2" style={{ marginTop: 12 }}>
+                        <div className="field">
+                          <div className="label">Age</div>
+                          <input className="input" value={profile.age} onChange={(e) => setProfile({ ...profile, age: e.target.value })} />
+                        </div>
+                        <div className="field">
+                          <div className="label">Location</div>
+                          <input className="input" value={profile.location} placeholder="Los Angeles, CA, USA" onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
+                        </div>
+
+                        <div className="field">
+                          <div className="label">Relationship</div>
+                          <select value={profile.relationship} onChange={(e) => setProfile({ ...profile, relationship: e.target.value })}>
+                            <option value="">Select</option>
+                            <option>Single</option>
+                            <option>Partnered</option>
+                            <option>Married</option>
+                          </select>
+                        </div>
+
+                        <div className="grid-2" style={{ gap: 10 }}>
+                          <div className="field">
+                            <div className="label">Kids</div>
+                            <input className="input" inputMode="numeric" value={profile.kids} onChange={(e) => setProfile({ ...profile, kids: e.target.value })} />
+                          </div>
+                          <div className="field">
+                            <div className="label">Pets</div>
+                            <input className="input" inputMode="numeric" value={profile.pets} onChange={(e) => setProfile({ ...profile, pets: e.target.value })} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="divider" style={{ marginTop: 14 }} />
+
+                      <div style={{ fontWeight: 750, marginTop: 10 }}>Income sources (monthly take-home)</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                        {profile.incomeSources.map((src) => (
+                          <div key={src.id} className="grid-2" style={{ gap: 10 }}>
+                            <div className="field">
+                              <div className="label">Source</div>
+                              <input className="input" value={src.name} onChange={(e) => setIncomeSource(src.id, { name: e.target.value })} />
+                            </div>
+                            <div className="row" style={{ alignItems: "flex-end" }}>
+                              <div className="field" style={{ flex: 1 }}>
+                                <div className="label">Monthly</div>
+                                <input
+                                  className="input"
+                                  inputMode="decimal"
+                                  value={src.monthly}
+                                  placeholder="e.g., 6500"
+                                  onChange={(e) => setIncomeSource(src.id, { monthly: e.target.value })}
+                                />
+                              </div>
+                              {profile.incomeSources.length > 1 ? (
+                                <button type="button" className="btn ghost" onClick={() => removeIncomeSource(src.id)} title="Remove">
+                                  <Trash2 size={16} />
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="row" style={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                          <button type="button" className="btn" onClick={() => addIncomeSource("Other income")}><Plus size={16} /> Add income source</button>
+                          <div className="small">
+                            Total monthly: <b>{formatMoney(totalIncomeMonthly)}</b>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="grid-4">
                     <div className="tile">
@@ -1056,6 +1165,82 @@ useEffect(() => {
                         {formatMoney(retirementView === "all" ? retirementTargetAll : retirementTargetOngoing)}
                       </div>
                     </div>
+                  </div>
+
+
+                  <div className="note" style={{ marginTop: 6 }}>
+                    <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <div style={{ fontWeight: 850 }}>Insights</div>
+                      <span className={"badge " + (savingsGrade.tone === "good" ? "good" : savingsGrade.tone === "warn" ? "warn" : "")}>
+                        {savingsGrade.label}
+                      </span>
+                    </div>
+
+                    <div className="insight-bar" style={{ marginTop: 10 }}>
+                      <div className="insight-bar-spent" style={{ width: `${Math.round(spentPct * 100)}%` }} />
+                      <div className="insight-bar-left" style={{ width: `${Math.round((1 - spentPct) * 100)}%` }} />
+                    </div>
+                    <div className="row small muted" style={{ justifyContent: "space-between", marginTop: 8 }}>
+                      <span>Spent: <b>{Math.round(spentPct * 100)}%</b></span>
+                      <span>Leftover: <b>{Math.round((1 - spentPct) * 100)}%</b></span>
+                    </div>
+
+                    <div className="grid-3" style={{ marginTop: 12 }}>
+                      <div className="tile">
+                        <div className="label">Top category</div>
+                        <div style={{ fontWeight: 850, marginTop: 6 }}>{topCategory ?? "—"}</div>
+                        <div className="small muted" style={{ marginTop: 6 }}>Highest monthly spend.</div>
+                      </div>
+
+                      <div className="tile">
+                        <div className="label">Retirement progress</div>
+                        <div style={{ fontWeight: 850, marginTop: 6 }}>{formatPct(retirementProgress, 0)}</div>
+                        <div className="small muted" style={{ marginTop: 6 }}>Net worth vs. your current target.</div>
+                      </div>
+
+                      <div className="tile">
+                        <div className="label">Next action</div>
+                        <div className="small muted" style={{ marginTop: 8 }}>
+                          {totalIncomeMonthly <= 0
+                            ? "Add an income source to unlock a real snapshot."
+                            : items.length === 0
+                              ? "Add your first expense item (so your savings rate is meaningful)."
+                              : goals.length === 0
+                                ? "Add a savings goal to see progress over time."
+                                : "Review your top category and decide if it still matches what matters."}
+                        </div>
+                        <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                          {totalIncomeMonthly <= 0 ? (
+                            <button type="button" className="btn" onClick={() => { setEditingBasics(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Edit income</button>
+                          ) : items.length === 0 ? (
+                            <button type="button" className="btn" onClick={() => setActiveTab("ikigai")}>Add expense</button>
+                          ) : goals.length === 0 ? (
+                            <button type="button" className="btn" onClick={() => setActiveTab("goals")}>Add goal</button>
+                          ) : (
+                            <button type="button" className="btn" onClick={() => setActiveTab("ikigai")}>Open Ikigai</button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {spendingByCategory.length > 0 ? (
+                      <div style={{ height: 220, marginTop: 14 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={spendingByCategory} dataKey="value" nameKey="name" innerRadius={55} outerRadius={85}>
+                              {spendingByCategory.map((row) => (
+                                <Cell key={row.name} fill={IKIGAI_CATEGORIES.find((c) => c.name === row.name)?.color ?? "#9aa3af"} />
+                              ))}
+                            </Pie>
+                            <ReTooltip formatter={(v, _n, p) => {
+                              const val = Number(v);
+                              const pct = totalIncomeMonthly > 0 ? val / totalIncomeMonthly : 0;
+                              return [`${formatMoney(val)} (${formatPct(pct, 1)})`, p?.payload?.name];
+                            }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="note">
@@ -1376,7 +1561,7 @@ useEffect(() => {
                         return (
                           <div
                             key={it.id}
-                            className={"tile item-row " + (isExpanded ? "expanded" : "")}
+                            className={"tile item-row " + (isExpanded ? "expanded " : "") + (dragItemId === it.id ? "dragging " : "") + (dragOverItemId === it.id ? "drop-target " : "")}
                             draggable
                             onDragStart={(e) => {
                             setDragItemId(it.id);
@@ -1486,7 +1671,7 @@ useEffect(() => {
                                     </select>
                                   </div>
 
-                                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
+                                  <div className="row goal-add-row" style={{ alignItems: "flex-end", gap: 10 }}>
                                     <label className="row small" style={{ alignItems: "center", gap: 8 }}>
                                       <input
                                         type="checkbox"
@@ -1666,7 +1851,7 @@ useEffect(() => {
                     return (
   <div
                         key={g.id}
-                        className="goal-wrap"
+                        className={"goal-wrap " + (dragGoalId === g.id ? "dragging " : "") + (dragOverGoalId === g.id ? "drop-target " : "")}
                         style={{ display: "flex", flexDirection: "column", gap: 10 }}
                         draggable
                         onDragStart={(e) => {
@@ -1960,8 +2145,14 @@ useEffect(() => {
                         className="input"
                         style={{ width: 92 }}
                         inputMode="decimal"
-                        value={(swr * 100).toFixed(2)}
-                        onChange={(e) => setSwr(safeNum(e.target.value) / 100)}
+                        value={swrText}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSwrText(v);
+                          const n = safeNum(v);
+                          if (Number.isFinite(n)) setSwr(n / 100);
+                        }}
+                        onBlur={() => setSwrText((swr * 100).toFixed(2))}
                       />
                       <span className="small muted">%</span>
                     </div>
