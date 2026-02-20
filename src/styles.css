@@ -479,37 +479,70 @@ body.dark option {
 .input::placeholder { color: var(--muted); opacity: 0.75; }
 
 
-/* Collapsible + draggable rows */
-.item-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  cursor:pointer;
-  user-select:none;
+/* P1: expandable/drag lists */
+.item-row { padding: 12px; }
+.item-row.expanded { border-color: rgba(58,159,191,0.35); }
+.item-main {
+  display: block;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
 }
-.item-title{
-  font-weight:700;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  max-width: 360px;
+.item-title { font-weight: 750; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.xbtn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 20px;
+  line-height: 1;
 }
-.item-money{
-  font-weight:800;
+.goal-wrap { padding: 0; }
+
+
+/* v1.1 drag feedback */
+.tile.dragging {
+  opacity: 0.45;
+  transform: scale(0.99);
 }
-.item-card.dragging{
-  opacity: 1;
-  transform: scale(1.01);
-  box-shadow: 0 12px 34px rgba(0,0,0,0.35);
-}
-.item-card.drop-target{
-  outline: 2px solid rgba(120, 190, 255, 0.35);
+.tile.dragover {
+  outline: 2px solid rgba(58,159,191,0.45);
   outline-offset: 2px;
 }
-.item-card.open{
-  border-color: rgba(120, 190, 255, 0.25);
+
+/* v1.1 guided chips + kicker */
+.chip{
+  border: 1px solid rgba(148,163,184,0.22);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(15,23,42,0.25);
+  color: var(--text);
+  font-size: 12px;
 }
-@media (max-width: 720px){
-  .item-title{ max-width: 180px; }
+body:not(.dark) .chip{
+  background: rgba(255,255,255,0.65);
+}
+.kicker{
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* v1.1 simple bar */
+.bar-wrap{
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148,163,184,0.18);
+  overflow: hidden;
+}
+.bar-fill{
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(58,159,191,0.75);
 }

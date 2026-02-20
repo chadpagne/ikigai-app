@@ -33,7 +33,7 @@ import {
  * - Vite + React
  * - localStorage persistence
  * - Guided onboarding (first time only)
- * - Tabs: Home, Build Your Ikigai, Savings Goals, Net Worth, Retirement, About
+ * - Tabs: Home, Build Your Ikigai, Savings, Net Worth, Retirement, About
  * - Dark mode fixed for tiles + nav text (CSS patch below)
  * - Mobile tooltip clamped to viewport (fixed here)
  * - Pie drill-down by category
@@ -56,17 +56,6 @@ function safeNum(v) {
 function clamp01(x) {
   return Math.max(0, Math.min(1, x));
 }
-
-function moveById(arr, dragId, dropId) {
-  if (!dragId || !dropId || dragId === dropId) return arr;
-  const from = arr.findIndex((x) => x.id === dragId);
-  const to = arr.findIndex((x) => x.id === dropId);
-  if (from < 0 || to < 0) return arr;
-  const next = arr.slice();
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  return next;
-}
 function formatMoney(n) {
   const abs = Math.abs(n);
   if (abs >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
@@ -88,6 +77,33 @@ function monthsBetween(from, toISO) {
 }
 function isSameMonthKey(a, b) {
   return a === b;
+}
+
+
+function getCategoryExamples(category) {
+  const map = {
+    "Housing": ["Rent", "Mortgage", "HOA", "Maintenance"],
+    "Car / Transportation": ["Gas", "Car payment", "Insurance", "Parking"],
+    "Food & Drink": ["Groceries", "Dining out", "Coffee"],
+    "Utilities": ["Electric", "Internet", "Phone"],
+    "Insurance": ["Health insurance", "Car insurance", "Home insurance"],
+    "Health & Fitness": ["Gym", "Therapy", "Supplements"],
+    "Subscriptions": ["Netflix", "Spotify", "iCloud"],
+    "Travel & Vacation": ["Flights", "Hotels", "Weekend trips"],
+    "Pet": ["Pet food", "Vet", "Grooming"],
+  };
+  return map[category] ?? ["Groceries", "Gas", "Gym", "Coffee"];
+}
+function getCategoryPlaceholder(category) {
+  const ex = getCategoryExamples(category)[0];
+  return ex ? `e.g., ${ex}` : "e.g., Groceries";
+}
+function savingsRateGrade(r) {
+  // Heuristic grading (tweakable later)
+  if (r >= 0.35) return { label: "Great", tone: "good" };
+  if (r >= 0.20) return { label: "Good", tone: "good" };
+  if (r >= 0.10) return { label: "OK", tone: "warn" };
+  return { label: "Needs improvement", tone: "warn" };
 }
 
 // Data
@@ -362,15 +378,19 @@ export default function App() {
   const [netWorthHistory, setNetWorthHistory] = useState([]);
 
   const [spendingView, setSpendingView] = useState("monthly"); // monthly | annual
+  const [spendListView, setSpendListView] = useState("monthly"); // monthly | annual (list rows)
+  const [goalListView, setGoalListView] = useState("monthly"); // monthly | annual (list rows)
   const [retirementView, setRetirementView] = useState("ongoing"); // ongoing | all
   const [swr, setSwr] = useState(0.04);
 
   const [pieMode, setPieMode] = useState("category"); // category | needwant
   const [categoryFilter, setCategoryFilter] = useState(null);
-  const [expandedGoalId, setExpandedGoalId] = useState(null);
   const [expandedItemId, setExpandedItemId] = useState(null);
   const [dragItemId, setDragItemId] = useState(null);
-  const [dropItemId, setDropItemId] = useState(null);
+  const [dragOverItemId, setDragOverItemId] = useState(null);
+  const [dragGoalId, setDragGoalId] = useState(null);
+  const [dragOverGoalId, setDragOverGoalId] = useState(null);
+  const [expandedGoalId, setExpandedGoalId] = useState(null);
 
   // Theme apply
   useEffect(() => {
@@ -586,6 +606,18 @@ useEffect(() => {
     setItems((arr) => arr.filter((x) => x.id !== id));
   }
 
+  function moveItem(fromId, toId) {
+    setItems((arr) => {
+      const from = arr.findIndex((x) => x.id === fromId);
+      const to = arr.findIndex((x) => x.id === toId);
+      if (from < 0 || to < 0 || from === to) return arr;
+      const next = [...arr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
   // Mutators: goals
   function addGoal() {
     const name = goalDraft.name.trim();
@@ -609,6 +641,18 @@ useEffect(() => {
   }
   function removeGoal(id) {
     setGoals((arr) => arr.filter((g) => g.id !== id));
+  }
+
+  function moveGoal(fromId, toId) {
+    setGoals((arr) => {
+      const from = arr.findIndex((x) => x.id === fromId);
+      const to = arr.findIndex((x) => x.id === toId);
+      if (from < 0 || to < 0 || from === to) return arr;
+      const next = [...arr];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   }
 
   // Mutators: assets/liabilities
@@ -688,8 +732,8 @@ useEffect(() => {
 ) : null}
           <div className="nav" role="navigation" aria-label="Primary">
             <TabButton id="home" label="Home" Icon={HomeIcon} />
-            <TabButton id="ikigai" label="Build Your Ikigai" Icon={Wallet} />
-            <TabButton id="goals" label="Savings Goals" Icon={PiggyBank} />
+            <TabButton id="ikigai" label="Your Ikigai" Icon={Wallet} />
+            <TabButton id="goals" label="Savings" Icon={PiggyBank} />
             <TabButton id="networth" label="Net Worth" Icon={LineChartIcon} />
             <TabButton id="retirement" label="Retirement" Icon={BarChart3} />
           </div>
@@ -710,8 +754,8 @@ useEffect(() => {
               <h3 style={{ margin: "8px 0" }}>Navigate</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button className="btn outline" onClick={() => (setActiveTab("home"), setDrawerOpen(false))}>Home</button>
-                <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Build Your Ikigai</button>
-                <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings Goals</button>
+                <button className="btn outline" onClick={() => (setActiveTab("ikigai"), setDrawerOpen(false))}>Your Ikigai</button>
+                <button className="btn outline" onClick={() => (setActiveTab("goals"), setDrawerOpen(false))}>Savings</button>
                 <button className="btn outline" onClick={() => (setActiveTab("networth"), setDrawerOpen(false))}>Net Worth</button>
                 <button className="btn outline" onClick={() => (setActiveTab("retirement"), setDrawerOpen(false))}>Retirement</button>
                 <button className="btn outline" onClick={() => (setActiveTab("about"), setDrawerOpen(false))}>About</button>
@@ -1032,7 +1076,7 @@ useEffect(() => {
           <div className="card">
             <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
-                <h2 className="h1">Build Your Ikigai</h2>
+                <h2 className="h1">Your Ikigai</h2>
                 <p className="sub">Some parts of life are essential. Others bring meaning. Most are a mix.</p>
               </div>
 
@@ -1078,12 +1122,142 @@ useEffect(() => {
 
   {/* ⬇️ THIS IS THE IMPORTANT PART ⬇️ */}
   {guidedAdd ? (
-    /* GUIDED MODE (placeholder for now) */
+    /* GUIDED MODE */
     <div className="note" style={{ marginTop: 12 }}>
-      <div style={{ fontWeight: 650, marginBottom: 6 }}>Guided mode</div>
-      <div className="small muted">
-        We’ll walk you through common expenses step by step.
-      </div>
+      <div className="kicker">Guided add • Step {guidedStep} of 4</div>
+
+      {guidedStep === 1 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Choose a category</div>
+          <select
+            value={quickDraft.category}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, category: e.target.value }))}
+          >
+            {IKIGAI_CATEGORIES.map((c) => (
+              <option key={c.name}>{c.name}</option>
+            ))}
+          </select>
+
+          <div className="small muted">
+            Examples:{" "}
+            {getCategoryExamples(quickDraft.category).map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                className="chip"
+                onClick={() => setQuickDraft((d) => ({ ...d, name: ex }))}
+                style={{ marginRight: 8, marginTop: 6 }}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+
+          <div className="row" style={{ justifyContent: "flex-end", marginTop: 6 }}>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(2)}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 2 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Name the expense</div>
+          <input
+            className="input"
+            value={quickDraft.name}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder={getCategoryPlaceholder(quickDraft.category)}
+          />
+          <div className="small muted">Pick one of the examples above, or type your own.</div>
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(1)}>
+              Back
+            </button>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(3)} disabled={!quickDraft.name.trim()}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 3 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Monthly cost</div>
+          <input
+            className="input"
+            inputMode="decimal"
+            value={quickDraft.monthly}
+            onChange={(e) => setQuickDraft((d) => ({ ...d, monthly: e.target.value }))}
+            placeholder="e.g., 450"
+          />
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(2)}>
+              Back
+            </button>
+            <button className="btn primary" type="button" onClick={() => setGuidedStep(4)} disabled={!String(quickDraft.monthly).trim()}>
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {guidedStep === 4 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontWeight: 750 }}>Details</div>
+
+          <div className="grid-2" style={{ gap: 10 }}>
+            <div className="field">
+              <div className="label">Need / Want</div>
+              <select
+                value={quickDraft.needWant}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, needWant: e.target.value }))}
+              >
+                <option value="need">Need</option>
+                <option value="want">Want</option>
+              </select>
+            </div>
+
+            <label className="row small" style={{ alignItems: "center", gap: 8, marginTop: 24 }}>
+              <input
+                type="checkbox"
+                checked={quickDraft.temporary}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, temporary: e.target.checked }))}
+              />
+              Temporary
+            </label>
+          </div>
+
+          {quickDraft.temporary ? (
+            <div className="field">
+              <div className="label">Ends (optional)</div>
+              <input
+                className="input"
+                type="date"
+                value={quickDraft.endDate}
+                onChange={(e) => setQuickDraft((d) => ({ ...d, endDate: e.target.value }))}
+              />
+            </div>
+          ) : null}
+
+          <div className="row" style={{ justifyContent: "space-between", marginTop: 6 }}>
+            <button className="btn" type="button" onClick={() => setGuidedStep(3)}>
+              Back
+            </button>
+            <button
+              className="btn primary"
+              type="button"
+              onClick={() => {
+                addQuickItem();
+                setGuidedStep(1);
+              }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   ) : (
     /* SIMPLE MODE (YOUR EXISTING QUICK ADD FORM) */
@@ -1119,8 +1293,6 @@ useEffect(() => {
         <div style={{ minWidth: 140 }}>
           <div className="small muted">Monthly</div>
           <input
-            inputMode="decimal"
-            pattern="[0-9]*[.,]?[0-9]*"
             value={quickDraft.monthly}
             onChange={(e) =>
               setQuickDraft({ ...quickDraft, monthly: e.target.value })
@@ -1170,14 +1342,19 @@ useEffect(() => {
       </div>
     </>
   )}
-</div>
+            </div>
 
               <div className="grid-2">
                 {/* Left: item list */}
                 <div>
                   <div className="row" style={{ alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ fontWeight: 850 }}>What you currently spend on</div>
+                    <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                      <Pill active={spendListView === "monthly"} label="Monthly" onClick={() => setSpendListView("monthly")} />
+                      <Pill active={spendListView === "annual"} label="Annual" onClick={() => setSpendListView("annual")} />
+                      
                     <Tip text="This is a mirror, not a grade. You can change anything." />
+                    </div>
                   </div>
 
                   {categoryFilter ? (
@@ -1193,171 +1370,151 @@ useEffect(() => {
                     {visibleItems.length === 0 ? (
                       <div className="tile muted">No items yet. Add a few to bring your Ikigai to life.</div>
                     ) : (
-  visibleItems.map((it) => {
-    const isOpen = expandedItemId === it.id;
-    const isDragging = dragItemId === it.id;
-    const isDrop = dropItemId === it.id;
+                      visibleItems.map((it) => {
+                        const isExpanded = expandedItemId === it.id;
+                        const monthly = safeNum(it.monthly);
+                        return (
+                          <div
+                            key={it.id}
+                            className={"tile item-row " + (isExpanded ? "expanded" : "")}
+                            draggable
+                            onDragStart={(e) => {
+                            setDragItemId(it.id);
+                            try {
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", String(it.id));
+                            } catch {}
+                          }}
+                          onDragEnd={() => { setDragItemId(null); setDragOverItemId(null); }}
+                          onDragEnter={() => setDragOverItemId(it.id)}
+                          onDragLeave={() => setDragOverItemId((cur) => (cur === it.id ? null : cur))}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => {
+                              if (dragItemId && dragItemId !== it.id) moveItem(dragItemId, it.id);
+                              setDragItemId(null);
+                            }}
+                          >
+                            <div className="row" style={{ alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                              <button
+                                type="button"
+                                className="item-main"
+                                onClick={() => setExpandedItemId(isExpanded ? null : it.id)}
+                                aria-expanded={isExpanded}
+                              >
+                                <div className="item-title">{it.name || "(Unnamed item)"}</div>
+                                <div className="small muted">
+                                  {it.category}
+                                  {it.temporary ? " • Temporary" : ""}
+                                </div>
+                              </button>
 
-    return (
-      <div
-        key={it.id}
-        className={
-          "tile item-card" +
-          (isOpen ? " open" : "") +
-          (isDragging ? " dragging" : "") +
-          (isDrop ? " drop-target" : "")
-        }
-        draggable
-        onDragStart={(e) => {
-          setDragItemId(it.id);
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", it.id);
-        }}
-        onDragEnd={() => {
-          setDragItemId(null);
-          setDropItemId(null);
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (dropItemId !== it.id) setDropItemId(it.id);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          const dragId = e.dataTransfer.getData("text/plain") || dragItemId;
-          setItems((prev) => moveById(prev, dragId, it.id));
-          setDragItemId(null);
-          setDropItemId(null);
-        }}
-      >
-        <div
-          className="item-row"
-          role="button"
-          tabIndex={0}
-          onClick={() => setExpandedItemId(isOpen ? null : it.id)}
-        >
-          <div style={{ minWidth: 0 }}>
-            <div className="row" style={{ gap: 10, alignItems: "center" }}>
-              <div className="item-title" title={it.name}>
-                {it.name || "Untitled"}
-              </div>
-              <span className="pill small">{it.category}</span>
-              <span className={"pill small " + (it.needWant === "need" ? "active" : "")}>
-                {it.needWant === "need" ? "Need" : "Want"}
-              </span>
-              {it.temporary ? <span className="pill small">Temp</span> : null}
-            </div>
-          </div>
+                              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                                <div className="small muted" title="Monthly / Annual">
+                                  <b>{formatMoney(monthly)}</b>{" "}
+                                  <span className="muted">/ {formatMoney(monthly * 12)}</span>
+                                </div>
 
-          <div className="row" style={{ gap: 10, alignItems: "center" }}>
-            <div className="item-money">{formatMoney(safeNum(it.monthly))}</div>
-            <button
-              type="button"
-              className="icon-btn"
-              title="Delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                setItems((prev) => prev.filter((x) => x.id !== it.id));
-                if (expandedItemId === it.id) setExpandedItemId(null);
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
+                                <button
+                                  type="button"
+                                  className="btn ghost"
+                                  onClick={() =>
+                                    updateItem(it.id, { needWant: it.needWant === "need" ? "want" : "need" })
+                                  }
+                                  title="Toggle need/want"
+                                >
+                                  <NeedWantBadge value={it.needWant} />
+                                </button>
 
-        {isOpen ? (
-          <div className="item-edit" style={{ marginTop: 10 }}>
-            <div className="grid-2" style={{ gap: 10 }}>
-              <div className="field">
-                <div className="label">Name</div>
-                <input
-                  className="input"
-                  value={it.name}
-                  onChange={(e) =>
-                    setItems((prev) =>
-                      prev.map((x) => (x.id === it.id ? { ...x, name: e.target.value } : x))
-                    )
-                  }
-                />
-              </div>
+                                <button
+                                  type="button"
+                                  className="btn xbtn"
+                                  onClick={() => removeItem(it.id)}
+                                  aria-label="Delete item"
+                                  title="Delete"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
 
-              <div className="field">
-                <div className="label">Category</div>
-                <select
-                  className="input"
-                  value={it.category}
-                  onChange={(e) =>
-                    setItems((prev) =>
-                      prev.map((x) => (x.id === it.id ? { ...x, category: e.target.value } : x))
-                    )
-                  }
-                >
-                  {IKIGAI_CATEGORIES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                            {isExpanded ? (
+                              <div style={{ marginTop: 12 }}>
+                                <div className="grid-2" style={{ gap: 10 }}>
+                                  <div className="field">
+                                    <div className="label">Name</div>
+                                    <input
+                                      className="input"
+                                      value={it.name}
+                                      onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                                    />
+                                  </div>
 
-              <div className="field">
-                <div className="label">Monthly</div>
-                <input
-                  className="input"
-                  inputMode="decimal"
-                  pattern="[0-9]*[.,]?[0-9]*"
-                  value={it.monthly}
-                  onChange={(e) =>
-                    setItems((prev) =>
-                      prev.map((x) => (x.id === it.id ? { ...x, monthly: e.target.value } : x))
-                    )
-                  }
-                />
-              </div>
+                                  <div className="grid-2" style={{ gap: 10 }}>
+                                    <div className="field">
+                                      <div className="label">Category</div>
+                                      <select
+                                        value={it.category}
+                                        onChange={(e) => updateItem(it.id, { category: e.target.value })}
+                                      >
+                                        {IKIGAI_CATEGORIES.map((c) => (
+                                          <option key={c.name}>{c.name}</option>
+                                        ))}
+                                      </select>
+                                    </div>
 
-              <div className="field">
-                <div className="label">Need / Want</div>
-                <select
-                  className="input"
-                  value={it.needWant}
-                  onChange={(e) =>
-                    setItems((prev) =>
-                      prev.map((x) => (x.id === it.id ? { ...x, needWant: e.target.value } : x))
-                    )
-                  }
-                >
-                  <option value="need">Need</option>
-                  <option value="want">Want</option>
-                </select>
-              </div>
-            </div>
+                                    <div className="field">
+                                      <div className="label">Monthly</div>
+                                      <input
+                                        className="input"
+                                        inputMode="decimal"
+                                        value={String(it.monthly)}
+                                        onChange={(e) => updateItem(it.id, { monthly: e.target.value })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
 
-            <label className="row small muted" style={{ gap: 6, marginTop: 10 }}>
-              <input
-                type="checkbox"
-                checked={!!it.temporary}
-                onChange={(e) =>
-                  setItems((prev) =>
-                    prev.map((x) =>
-                      x.id === it.id ? { ...x, temporary: e.target.checked } : x
-                    )
-                  )
-                }
-              />
-              Include temporary
-            </label>
+                                <div className="grid-2" style={{ marginTop: 10 }}>
+                                  <div className="field">
+                                    <div className="label">Need / Want</div>
+                                    <select
+                                      value={it.needWant}
+                                      onChange={(e) => updateItem(it.id, { needWant: e.target.value })}
+                                    >
+                                      <option value="need">Need</option>
+                                      <option value="want">Want</option>
+                                    </select>
+                                  </div>
 
-            <div className="row" style={{ justifyContent: "flex-end", marginTop: 10 }}>
-              <button type="button" className="btn" onClick={() => setExpandedItemId(null)}>
-                Done
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    );
-  })
-)}
+                                  <div className="row" style={{ alignItems: "flex-end", gap: 10 }}>
+                                    <label className="row small" style={{ alignItems: "center", gap: 8 }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={!!it.temporary}
+                                        onChange={(e) => updateItem(it.id, { temporary: e.target.checked })}
+                                      />
+                                      Temporary
+                                    </label>
+
+                                    {it.temporary ? (
+                                      <div className="field" style={{ flex: 1 }}>
+                                        <div className="label">Ends (optional)</div>
+                                        <input
+                                          className="input"
+                                          type="date"
+                                          value={it.endDate || ""}
+                                          onChange={(e) => updateItem(it.id, { endDate: e.target.value })}
+                                        />
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
@@ -1419,7 +1576,7 @@ useEffect(() => {
                   ) : null}
                 </div>
               </div>
-</div>
+            </div>
           </div>
         )}
 
@@ -1430,7 +1587,7 @@ useEffect(() => {
               <div>
                 <div className="row" style={{ alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
                   <div>
-                    <h2 className="h1">Savings Goals</h2>
+                    <h2 className="h1">Savings</h2>
                     <p className="sub">Progress should feel clear: what you have now — and how your monthly saving changes the future.</p>
                   </div>
                   <Tip text="Solid = what you have now. Pattern = what your current $/mo can reach by your end date (or next 12 months)." />
@@ -1507,7 +1664,27 @@ useEffect(() => {
                     };
 
                     return (
-  <div key={g.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+  <div
+                        key={g.id}
+                        className="goal-wrap"
+                        style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                        draggable
+                        onDragStart={(e) => {
+                          setDragGoalId(g.id);
+                          try {
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", String(g.id));
+                          } catch {}
+                        }}
+                        onDragEnd={() => { setDragGoalId(null); setDragOverGoalId(null); }}
+                        onDragEnter={() => setDragOverGoalId(g.id)}
+                        onDragLeave={() => setDragOverGoalId((cur) => (cur === g.id ? null : cur))}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => {
+                          if (dragGoalId && dragGoalId !== g.id) moveGoal(dragGoalId, g.id);
+                          setDragGoalId(null);
+                        }}
+                      >
     <BucketTile
       title={g.name}
       subtitle={`Category: ${g.category}`}
@@ -1579,11 +1756,12 @@ useEffect(() => {
           style={{ marginTop: 10, justifyContent: "flex-end" }}
         >
           <button
-            className="btn"
+            className="btn xbtn"
             onClick={() => removeGoal(g.id)}
-            title="Remove"
+            title="Delete"
+            aria-label="Delete goal"
           >
-            <Trash2 size={16} /> Remove
+            ×
           </button>
         </div>
       </div>
