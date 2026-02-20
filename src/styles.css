@@ -5,7 +5,6 @@
   --bg:#f5f7f7;
   --card:rgba(255,255,255,0.92);
   --tile:rgba(255,255,255,0.92);
-  --input:rgba(255,255,255,0.88);
 
   --text:rgba(0,0,0,0.88);
   --muted:rgba(0,0,0,0.56);
@@ -17,7 +16,6 @@ body.dark{
   --bg:#0b0f12;
   --card:rgba(18,24,28,0.92);
   --tile:rgba(18,24,28,0.92);
-  --input:rgba(255,255,255,0.06);
 
   --text:rgba(255,255,255,0.90);
   --muted:rgba(255,255,255,0.62);
@@ -26,14 +24,8 @@ body.dark{
 }
 
 *{ box-sizing:border-box; }
-html,body{
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale; height:100%; }
+html,body{ height:100%; }
 body{
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   margin:0;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
   background:var(--bg);
@@ -86,7 +78,7 @@ body.dark .header{
   display:inline-flex;
   align-items:center;
   gap:8px;
-  padding: 10px 12px;
+  padding:10px 12px;
   border-radius:999px;
   background:transparent;
   border:1px solid var(--border);
@@ -106,10 +98,7 @@ body.dark .header{
   box-shadow:var(--shadow);
 }
 
-.card-body{
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale; padding:18px; }
+.card-body{ padding:18px; }
 
 .h1{ margin:0; font-size:22px; font-weight:900; }
 .sub{ margin:6px 0 0; color:var(--muted); }
@@ -177,12 +166,12 @@ body.dark .header{
 }
 
 .field{ display:flex; flex-direction:column; gap:6px; }
-input, textarea, select, .input{
+.input, select{
   width:100%;
-  padding: 10px 12px;
+  padding:10px 12px;
   border-radius:12px;
   border:1px solid var(--border);
-  background:var(--input);
+  background:transparent;
   color:var(--text);
   outline:none;
 }
@@ -196,7 +185,7 @@ input, textarea, select, .input{
   align-items:center;
   justify-content:center;
   gap:8px;
-  padding: 10px 12px;
+  padding:10px 12px;
   border-radius:12px;
   border:1px solid var(--border);
   background:transparent;
@@ -285,15 +274,15 @@ input, textarea, select, .input{
 
   /* polish */
   opacity: 0;
+  transform: translateX(-50%) translateY(6px);
   pointer-events: none;
   animation: tipIn 140ms ease-out forwards;
-  max-height: 180px;
-  overflow: auto;
 }
 
 @keyframes tipIn{
   to{
     opacity: 1;
+    transform: translateX(-50%) translateY(0px);
   }
 }
 
@@ -412,84 +401,48 @@ body.dark option {
 
 @media (hover: hover) and (pointer: fine) {
   .tooltip-wrap .chip:hover + .tooltip-pop {
-  line-height: 1.35;
-  font-size: 12.5px;
     display: inline-block;
   }
 }
 
 
-/* Brand is now a button */
-.brand {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
+/* v1.1.4 additions */
+.bar{
+  display:flex;
+  height:10px;
+  border-radius:999px;
+  overflow:hidden;
+  background: rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.08);
 }
+.bar-spent{ height:100%; background: rgba(240, 85, 85, 0.75); }
+.bar-left{ height:100%; background: rgba(58,159,191,0.75); }
 
-/* Better mobile tooltips */
-.tooltip-pop {
-  line-height: 1.35;
-  font-size: 12.5px;
-  max-width: min(280px, calc(100vw - 24px));
-  padding: 10px 12px;
-  line-height: 1.35;
-}
-@media (max-width: 520px) {
-  .tooltip-pop {
-  line-height: 1.35;
-  font-size: 12.5px;
-    max-width: min(240px, calc(100vw - 24px));
-    font-size: 13px;
-    padding: 10px 12px;
-  }
-}
-
-/* Reduce ugly blue rectangle focus rings */
-:where(button, a, input, select, textarea, .btn, .pill, .tile):focus {
-  outline: none;
-}
-:where(button, a, input, select, textarea, .btn, .pill, .tile):focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(58,159,191,0.28);
-  border-radius: 14px;
-}
-
-/* Mobile: icon-only tabs + hide home shortcuts */
-@media (max-width: 640px) {
-  .tab .tab-label { display: none; }
-  .tab { padding-left: 10px; padding-right: 10px; }
-  .home-shortcuts { display: none; }
-}
-
-
-/* P0.2 typography + input polish */
-.label, .kicker { letter-spacing: 0.01em; }
-.btn, .tab, .pill { font-weight: 650; }
-.h1 { letter-spacing: -0.01em; }
-.small, .sub { line-height: 1.35; }
-
-/* Ensure dark-mode inputs match selects visually */
-.input, select, textarea {
-  background: var(--input);
+.badge.mid{
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.14);
   color: var(--text);
 }
-.input::placeholder { color: var(--muted); opacity: 0.75; }
 
-/* Drag + drop row cues */
-.tile.item-row.dragging, .tile.goal-row.dragging {
-  opacity: 0.95;
-  transform: scale(0.99);
-  box-shadow: none !important;
+/* Guided example chips */
+.example-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
 }
-.tile.item-row.dragover, .tile.goal-row.dragover {
-  outline: 1px solid var(--accent);
-  outline-offset: 2px;
+.example-chip{
+  padding:8px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  font-size: 12px;
+  line-height: 1.2;
+  cursor:pointer;
 }
+.example-chip:hover{ background: rgba(255,255,255,0.10); }
 
-/* Better pill touch targets */
-.pill {
-  min-height: 34px;
+@media (max-width: 720px){
+  .grid-3{ grid-template-columns: 1fr !important; }
+  .row{ flex-wrap: wrap; }
+  .btn.primary{ width: 100%; }
 }
