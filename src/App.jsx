@@ -388,6 +388,23 @@ export default function App() {
   const [expandedItemId, setExpandedItemId] = useState(null);
   const [dragItemId, setDragItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia && window.matchMedia("(pointer: coarse)");
+      const apply = () => setIsCoarsePointer(!!(mq && mq.matches));
+      apply();
+      if (mq && mq.addEventListener) mq.addEventListener("change", apply);
+      else if (mq && mq.addListener) mq.addListener(apply);
+      return () => {
+        if (mq && mq.removeEventListener) mq.removeEventListener("change", apply);
+        else if (mq && mq.removeListener) mq.removeListener(apply);
+      };
+    } catch {
+      setIsCoarsePointer(false);
+    }
+  }, []);
+
   const [dragGoalId, setDragGoalId] = useState(null);
   const [dragOverGoalId, setDragOverGoalId] = useState(null);
   const [expandedGoalId, setExpandedGoalId] = useState(null);
@@ -538,7 +555,7 @@ useEffect(() => {
   // Goals progress
   const goalProgress = useMemo(() => {
     const now = new Date();
-    return goals.map((g) => {
+    return goals.map((g, gIdx) => {
       const target = safeNum(g.target);
       const current = safeNum(g.current);
       const monthly = safeNum(g.monthly);
@@ -1370,14 +1387,14 @@ useEffect(() => {
                     {visibleItems.length === 0 ? (
                       <div className="tile muted">No items yet. Add a few to bring your Ikigai to life.</div>
                     ) : (
-                      visibleItems.map((it) => {
+                      visibleItems.map((it, idx) => {
                         const isExpanded = expandedItemId === it.id;
                         const monthly = safeNum(it.monthly);
                         return (
                           <div
                             key={it.id}
                             className={"tile item-row " + (isExpanded ? "expanded" : "")}
-                            draggable
+                            draggable={!isCoarsePointer}
                             onDragStart={(e) => {
                             setDragItemId(it.id);
                             try {
@@ -1409,9 +1426,21 @@ useEffect(() => {
                               </button>
 
                               <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                                <div className="small muted" title="Monthly / Annual">
-                                  <b>{formatMoney(monthly)}</b>{" "}
-                                  <span className="muted">/ {formatMoney(monthly * 12)}</span>
+                                <div className="small muted">
+                                  {spendListView === "monthly" ? (
+                                    <>
+                                      Monthly • <b>{formatMoney(monthly)}</b>
+                                    </>
+                                  ) : spendListView === "annual" ? (
+                                    <>
+                                      Annual • <b>{formatMoney(monthly * 12)}</b>
+                                    </>
+                                  ) : (
+                                    <>
+                                      Monthly <b>{formatMoney(monthly)}</b>{" "}
+                                      <span className="muted">· Annual <b>{formatMoney(monthly * 12)}</b></span>
+                                    </>
+                                  )}
                                 </div>
 
                                 <button
@@ -1424,6 +1453,35 @@ useEffect(() => {
                                 >
                                   <NeedWantBadge value={it.needWant} />
                                 </button>
+
+                                {isCoarsePointer ? (
+                                  <div className="row" style={{ gap: 6 }}>
+                                    <button
+                                      type="button"
+                                      className="btn ghost"
+                                      onClick={() => idx > 0 && moveItem(it.id, visibleItems[idx - 1].id)}
+                                      disabled={idx === 0}
+                                      title="Move up"
+                                      aria-label="Move up"
+                                      style={{ minWidth: 36 }}
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn ghost"
+                                      onClick={() =>
+                                        idx < visibleItems.length - 1 && moveItem(it.id, visibleItems[idx + 1].id)
+                                      }
+                                      disabled={idx === visibleItems.length - 1}
+                                      title="Move down"
+                                      aria-label="Move down"
+                                      style={{ minWidth: 36 }}
+                                    >
+                                      ↓
+                                    </button>
+                                  </div>
+                                ) : null}
 
                                 <button
                                   type="button"
@@ -1668,7 +1726,7 @@ useEffect(() => {
                         key={g.id}
                         className="goal-wrap"
                         style={{ display: "flex", flexDirection: "column", gap: 10 }}
-                        draggable
+                        draggable={!isCoarsePointer}
                         onDragStart={(e) => {
                           setDragGoalId(g.id);
                           try {
@@ -1755,6 +1813,34 @@ useEffect(() => {
           className="row"
           style={{ marginTop: 10, justifyContent: "flex-end" }}
         >
+          {isCoarsePointer ? (
+            <div className="row" style={{ gap: 6, marginRight: 6 }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => gIdx > 0 && moveGoal(g.id, goals[gIdx - 1].id)}
+                disabled={gIdx === 0}
+                title="Move up"
+                aria-label="Move goal up"
+                style={{ minWidth: 36 }}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() =>
+                  gIdx < goals.length - 1 && moveGoal(g.id, goals[gIdx + 1].id)
+                }
+                disabled={gIdx === goals.length - 1}
+                title="Move down"
+                aria-label="Move goal down"
+                style={{ minWidth: 36 }}
+              >
+                ↓
+              </button>
+            </div>
+          ) : null}
           <button
             className="btn xbtn"
             onClick={() => removeGoal(g.id)}

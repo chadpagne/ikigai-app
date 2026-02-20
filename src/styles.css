@@ -546,3 +546,25 @@ body:not(.dark) .chip{
   border-radius: 999px;
   background: rgba(58,159,191,0.75);
 }
+
+
+/* P1 fixes: guided example chips + mobile reorder buttons */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.chip {
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.03);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.chip:active { transform: translateY(1px); }
+@media (max-width: 720px){
+  .chip { font-size: 12px; padding: 10px 12px; }
+}
